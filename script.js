@@ -25,7 +25,7 @@ function iniciarEscaneo() {
         config,
         (textoDetectado) => {
             // Convertimos a mayúsculas para evitar errores de coincidencia
-            if(textoDetectado.toUpperCase().trim() === "GUARDIA-COFARMEN") {
+            if(textoDetectado.toUpperCase().trim() === "GUARDIA_COFARMEN") {
                 qrValidado = true;
                 document.getElementById('acciones').style.display = 'block';
                 document.getElementById('seccion-dni').style.display = 'none';
