@@ -1,6 +1,6 @@
 var html5QrCode = null;
-// API vinculada a tu planilla de Cofarmen
-var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
+// Forzamos a SheetDB a usar la Hoja 1
+var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm?sheet=Hoja 1';
 
 async function procesarAsistencia() {
     var dniVal = document.getElementById('dni').value;
@@ -13,18 +13,16 @@ async function procesarAsistencia() {
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
-        // BUSQUEDA: Busca en la Hoja 1 usando la columna "DNI"
-        var respuesta = await fetch(urlAPI + "/search?DNI=" + dniVal);
+        // Búsqueda exacta en Hoja 1 por la columna DNI
+        var respuesta = await fetch(urlAPI + "&DNI=" + dniVal); 
         var datos = await respuesta.json();
         
-        // Filtra los registros de hoy usando la columna "Fecha"
         var registrosHoy = datos.filter(function(item) {
             return item["Fecha"] && item["Fecha"].includes(hoy);
         });
 
         var cantidad = registrosHoy.length;
 
-        // LOGICA: 0 (Ingreso) y 3 (Egreso) son directos. 1 y 2 (Pausas) requieren QR.
         if (cantidad === 0 || cantidad === 3) {
             enviarDatosCofarmen(dniVal, cantidad);
         } else {
@@ -56,7 +54,7 @@ function iniciarEscaneo(dniU, cuenta) {
 
 function enviarDatosCofarmen(dniU, cuenta) {
     var mov = "";
-    // Nombres de columna exactos según la imagen 1000330598.jpg
+    // Nombres exactos de la Hoja 1 (Imagen 1000330598.jpg)
     if (cuenta === 0) mov = "Ingreso";
     else if (cuenta === 1) mov = "Inicio Pausa";
     else if (cuenta === 2) mov = "Fin Pausa";
@@ -64,12 +62,13 @@ function enviarDatosCofarmen(dniU, cuenta) {
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
         var ahora = new Date();
-        // REGISTRO: Envía los datos para crear una nueva fila en la Hoja 1
+        
+        // El objeto DEBE tener las mismas mayúsculas que tu planilla verde
         var fila = {
             "Fecha": ahora.toLocaleDateString('es-AR'),
-            "Nombre": "PERSONAL PLANTA", // Aquí podrías vincular el nombre real si lo tenés
+            "Nombre": "PERSONAL PLANTA", 
             "DNI": dniU,
-            "Distancia": pos.coords.latitude + ", " + pos.coords.longitude
+            "Distancia": pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6)
         };
         
         fila[mov] = ahora.toLocaleTimeString('es-AR');
@@ -82,7 +81,7 @@ function enviarDatosCofarmen(dniU, cuenta) {
             });
 
             if (res.ok) {
-                alert("REGISTRO DE " + mov.toUpperCase() + " EXITOSO EN HOJA 1");
+                alert("REGISTRO DE " + mov.toUpperCase() + " GUARDADO EN HOJA 1");
                 location.reload();
             }
         } catch (e) { alert("ERROR AL GUARDAR"); }
