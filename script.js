@@ -1,104 +1,111 @@
-// Variable para el control de la cámara
+// Variable global para la cámara
 var html5QrCode = null;
+// Nueva API proporcionada por el usuario
 var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
 
-// 1. Función principal del botón
+/**
+ * Función principal activada al presionar "REGISTRAR ASISTENCIA"
+ */
 async function procesarAsistencia() {
     var dni = document.getElementById('dni').value;
     var pin = document.getElementById('pin').value;
 
     if (!dni || !pin) {
-        alert("Complete DNI y PIN");
+        alert("Por favor, ingrese su DNI y PIN.");
         return;
     }
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
+        // Consulta para verificar movimientos previos del día
         var respuesta = await fetch(urlAPI + "/search?dni=" + dni);
         var datos = await respuesta.json();
         
-        // Filtrar registros del día
         var registrosHoy = datos.filter(function(item) {
             return item["fecha y hora"] && item["fecha y hora"].includes(hoy);
         });
 
         var cantidad = registrosHoy.length;
 
-        // Lógica: 0 (Ingreso) y 3 (Egreso) son directos. 1 y 2 (Pausas) piden QR.
+        // Lógica de validación: 0 (Ingreso) y 3 (Egreso) son directos. 
+        // 1 (Inicio Pausa) y 2 (Fin Pausa) requieren QR.
         if (cantidad === 0 || cantidad === 3) {
-            enviarDatosAlServidor(dni, cantidad);
+            enviarDatosCofarmen(dni, cantidad);
         } else {
-            alert("Esta acción requiere escaneo de QR en Guardia");
-            iniciarCamaraQR(dni, cantidad);
+            alert("El registro de pausa requiere escaneo en Guardia.");
+            iniciarEscaneoSeguro(dni, cantidad);
         }
     } catch (error) {
-        alert("Error de conexión con la planilla");
+        console.error(error);
+        alert("Error de conexión con la planilla. Verifique su señal en planta.");
     }
 }
 
-// 2. Función para activar la cámara
-function iniciarCamaraQR(dniU, cuenta) {
-    var zonaLectura = document.getElementById('reader');
-    zonaLectura.style.display = 'block';
+/**
+ * Activa el escaneo QR solo para las pausas
+ */
+function iniciarEscaneoSeguro(dniU, cuenta) {
+    var zonaLector = document.getElementById('reader');
+    zonaLector.style.display = 'block';
     
     html5QrCode = new Html5Qrcode("reader");
     
-    var configuracion = { fps: 10, qrbox: 250 };
-    
     html5QrCode.start(
         { facingMode: "environment" }, 
-        configuracion,
-        async function(textoQR) {
-            if (textoQR.toUpperCase().includes("GUARDIA")) {
+        { fps: 10, qrbox: 250 },
+        async function(resultadoQR) {
+            // Validamos que sea el código de la guardia de Cofarmen
+            if (resultadoQR.toUpperCase().includes("GUARDIA")) {
                 await html5QrCode.stop();
-                zonaLectura.style.display = 'none';
-                enviarDatosAlServidor(dniU, cuenta);
+                zonaLector.style.display = 'none';
+                enviarDatosCofarmen(dniU, cuenta);
             }
         },
-        function(error) { /* Escaneando... */ }
+        function(error) { /* Escaneo en curso... */ }
     ).catch(function(err) {
-        alert("No se pudo iniciar la cámara: " + err);
+        alert("Error al abrir la cámara: " + err);
     });
 }
 
-// 3. Función de envío final a la Hoja 1
-function enviarDatosAlServidor(dniU, cuenta) {
-    var movimiento = "";
-    if (cuenta === 0) movimiento = "ingreso";
-    else if (cuenta === 1) movimiento = "inicio de pausa";
-    else if (cuenta === 2) movimiento = "fin de pausa";
-    else if (cuenta === 3) movimiento = "egreso";
+/**
+ * Envío final de datos a la Hoja 1
+ */
+function enviarDatosCofarmen(dniU, cuenta) {
+    var columnaMovimiento = "";
+    if (cuenta === 0) columnaMovimiento = "ingreso";
+    else if (cuenta === 1) columnaMovimiento = "inicio de pausa";
+    else if (cuenta === 2) columnaMovimiento = "fin de pausa";
+    else if (cuenta === 3) columnaMovimiento = "egreso";
 
     navigator.geolocation.getCurrentPosition(async function(posicion) {
         var ahora = new Date();
-        var coordenadas = posicion.coords.latitude + ", " + posicion.coords.longitude;
+        var localizacion = posicion.coords.latitude + ", " + posicion.coords.longitude;
         
-        // Construcción del objeto de datos
-        var fila = {
+        var registro = {
             "fecha y hora": ahora.toLocaleString('es-AR'),
             "dni": dniU,
             "nombre": "Personal Planta",
-            "distancia": coordenadas
+            "distancia": localizacion
         };
         
-        // Asignar el tiempo al movimiento que corresponde
-        fila[movimiento] = ahora.toLocaleTimeString('es-AR');
+        // Asignamos la hora al movimiento correspondiente
+        registro[columnaMovimiento] = ahora.toLocaleTimeString('es-AR');
 
         try {
-            var postRes = await fetch(urlAPI, {
+            var postEnvio = await fetch(urlAPI, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ "data": [fila] })
+                body: JSON.stringify({ "data": [registro] })
             });
 
-            if (postRes.ok) {
-                alert("Registro de " + movimiento.toUpperCase() + " completado");
+            if (postEnvio.ok) {
+                alert("Registro de " + columnaMovimiento.toUpperCase() + " realizado con éxito.");
                 location.reload();
             }
-        } catch (err) {
-            alert("Error al guardar en la hoja de MOVIMIENTOS");
+        } catch (e) {
+            alert("Error al guardar los datos en la planilla.");
         }
     }, function() {
-        alert("El GPS es obligatorio para el registro");
+        alert("El GPS debe estar activo para validar la ubicación en Mendoza.");
     });
 }
