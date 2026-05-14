@@ -4,41 +4,41 @@ let html5QrCode;
 function iniciarEscaneo() {
     const dniVal = document.getElementById('dni').value;
     if (!dniVal) {
-        alert("Por favor, ingrese su DNI antes de validar.");
+        alert("Por favor, ingrese su DNI.");
         return;
     }
 
     const readerDiv = document.getElementById('reader');
     readerDiv.style.display = 'block';
     
-    // Configuramos el lector con mayor sensibilidad
     html5QrCode = new Html5Qrcode("reader");
     
-    const config = { 
-        fps: 20, // Más frames por segundo para capturar rápido
-        qrbox: { width: 280, height: 280 }, // Cuadro de escaneo más grande
-        aspectRatio: 1.0 
-    };
-
     html5QrCode.start(
         { facingMode: "environment" }, 
-        config,
+        { fps: 15, qrbox: 250 },
         (textoDetectado) => {
-            // Convertimos a mayúsculas para evitar errores de coincidencia
-            if(textoDetectado.toUpperCase().trim() === "GUARDIA_COFARMEN") {
+            // ALERTA DE PRUEBA: Si sale este cartel, la cámara funciona.
+            alert("Capturado: " + textoDetectado); 
+
+            const limpio = textoDetectado.toUpperCase().trim();
+            
+            // Acepta guion bajo, medio o incluso espacio
+            if(limpio.includes("GUARDIA")) {
                 qrValidado = true;
                 document.getElementById('acciones').style.display = 'block';
                 document.getElementById('seccion-dni').style.display = 'none';
                 document.getElementById('reader').style.display = 'none';
-                document.getElementById('mensaje').innerText = "QR Validado.";
-                document.getElementById('mensaje').style.color = "green";
-                html5QrCode.stop().catch(err => console.error(err));
+                document.getElementById('mensaje').innerText = "Validado con éxito.";
+                html5QrCode.stop();
             }
-        }
+        },
+        (error) => { /* Escaneando... */ }
     ).catch((err) => {
-        alert("Error al iniciar cámara: " + err);
+        alert("Error de Hardware/Permisos: " + err);
     });
 }
+
+// ... (mantené la función registrarMovimiento igual)
 
 function registrarMovimiento() {
     const dniU = document.getElementById('dni').value;
