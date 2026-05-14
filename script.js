@@ -2,34 +2,35 @@ var html5QrCode = null;
 var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
 
 async function procesarAsistencia() {
-    var dni = document.getElementById('dni').value;
-    var pin = document.getElementById('pin').value;
+    var dniInput = document.getElementById('dni').value;
+    var pinInput = document.getElementById('pin').value;
 
-    if (!dni || !pin) {
+    if (!dniInput || !pinInput) {
         alert("Complete DNI y PIN");
         return;
     }
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
-        // Buscamos por la columna exacta "dni" (en minúsculas según la planilla)
-        var respuesta = await fetch(urlAPI + "/search?dni=" + dni);
+        // Buscamos usando "DNI" exactamente como está en la foto
+        var respuesta = await fetch(urlAPI + "/search?DNI=" + dniInput);
         var datos = await respuesta.json();
         
+        // Filtramos por la columna "Fecha" (primera en mayúscula)
         var registrosHoy = datos.filter(function(item) {
-            return item["fecha y hora"] && item["fecha y hora"].includes(hoy);
+            return item["Fecha"] && item["Fecha"].includes(hoy);
         });
 
         var cantidad = registrosHoy.length;
 
         if (cantidad === 0 || cantidad === 3) {
-            enviarDatosCofarmen(dni, cantidad);
+            enviarDatosCofarmen(dniInput, cantidad);
         } else {
-            alert("Acción protegida: Escanee el QR en Guardia");
-            iniciarEscaneo(dni, cantidad);
+            alert("EL REGISTRO DE PAUSA REQUIERE ESCANEO EN GUARDIA");
+            iniciarEscaneo(dniInput, cantidad);
         }
     } catch (error) {
-        alert("Error de conexión con la planilla");
+        alert("ERROR DE CONEXIÓN CON LA PLANILLA");
     }
 }
 
@@ -48,24 +49,24 @@ function iniciarEscaneo(dniU, cuenta) {
                 enviarDatosCofarmen(dniU, cuenta);
             }
         }
-    ).catch(function(err) { alert("Error de cámara"); });
+    ).catch(function(err) { alert("ERROR DE CÁMARA"); });
 }
 
 function enviarDatosCofarmen(dniU, cuenta) {
     var movimiento = "";
-    // Nombres exactos de las columnas en tu Hoja 1
-    if (cuenta === 0) movimiento = "ingreso";
-    else if (cuenta === 1) movimiento = "inicio de pausa";
-    else if (cuenta === 2) movimiento = "fin de pausa";
-    else if (cuenta === 3) movimiento = "egreso";
+    // Nombres exactos según la foto 1000330598.jpg
+    if (cuenta === 0) movimiento = "Ingreso";
+    else if (cuenta === 1) movimiento = "Inicio Pausa";
+    else if (cuenta === 2) movimiento = "Fin Pausa";
+    else if (cuenta === 3) movimiento = "Egreso";
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
         var ahora = new Date();
         var fila = {
-            "fecha y hora": ahora.toLocaleString('es-AR'),
-            "dni": dniU,
-            "nombre": "Personal Planta",
-            "distancia": pos.coords.latitude + ", " + pos.coords.longitude
+            "Fecha": ahora.toLocaleDateString('es-AR'),
+            "Nombre": "Personal Planta",
+            "DNI": dniU,
+            "Distancia": pos.coords.latitude + ", " + pos.coords.longitude
         };
         
         fila[movimiento] = ahora.toLocaleTimeString('es-AR');
@@ -78,9 +79,9 @@ function enviarDatosCofarmen(dniU, cuenta) {
             });
 
             if (res.ok) {
-                alert("Registro de " + movimiento.toUpperCase() + " exitoso");
+                alert("REGISTRO DE " + movimiento.toUpperCase() + " EXITOSO");
                 location.reload();
             }
-        } catch (e) { alert("Error al guardar"); }
-    }, function() { alert("GPS obligatorio"); });
+        } catch (e) { alert("ERROR AL GUARDAR"); }
+    }, function() { alert("GPS OBLIGATORIO"); });
 }
