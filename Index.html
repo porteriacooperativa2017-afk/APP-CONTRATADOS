@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cofarmen - Acceso Planta</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 90%; max-width: 350px; text-align: center; }
+        .logo { width: 80px; margin-bottom: 10px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; }
+        .btn-principal { width: 100%; padding: 15px; background: #1b5e20; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        #reader { width: 100%; margin-top: 10px; border-radius: 8px; }
+        .btn-qr { background: #388e3c; color: white; border: none; padding: 10px; width: 100%; border-radius: 6px; margin-bottom: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="https://lh3.googleusercontent.com/d/1k7147fuNPZkmJwPkbwaM2jjt9iAuUF6O" class="logo">
+        <h2 style="color: #1b5e20;">COFARMEN</h2>
+        
+        <!-- Paso 1: Identificación -->
+        <input type="number" id="dni" placeholder="Ingresa tu DNI">
+        <input type="password" id="pass" placeholder="Ingresa tu Contraseña">
+
+        <!-- Paso 2: Selección de Acción -->
+        <select id="tipo-evento">
+            <option value="INGRESO">ENTRADA JORNADA</option>
+            <option value="INICIO PAUSA">INICIO PAUSA</option>
+            <option value="REGRESO PAUSA">REGRESO DE PAUSA</option>
+            <option value="EGRESO">SALIDA FINAL</option>
+        </select>
+
+        <!-- Paso 3: Validación Física -->
+        <div id="reader"></div>
+        <button id="btn-scan" class="btn-qr">1. ESCANEAR QR DE GUARDIA</button>
+
+        <!-- Paso 4: Confirmación -->
+        <button id="btn-registrar" class="btn-principal">2. CONFIRMAR REGISTRO</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+:root {
+    --verde-primario: #43a047;
+    --verde-oscuro: #2e7d32;
+    --fondo: #f1f8e9;
+    --blanco: #ffffff;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--fondo);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.card {
+    background: var(--blanco);
+    padding: 30px;
+    border-radius: 25px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+    width: 90%;
+    max-width: 350px;
+    text-align: center;
+}
+
+.f-logo {
+    width: 90px;
+    height: 90px;
+    margin-bottom: 15px;
+    animation: pulse 2.5s infinite;
+    border-radius: 50%;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(67, 160, 71, 0.4); }
+    70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(67, 160, 71, 0); }
+    100% { transform: scale(1); }
+}
+
+h2 { color: var(--verde-primario); margin: 5px 0; font-size: 24px; }
+.subtitle { color: #888; font-size: 12px; margin-bottom: 25px; font-weight: bold; }
+
+.input-group { text-align: left; margin-bottom: 15px; }
+label { display: block; font-size: 13px; color: var(--verde-primario); font-weight: 700; margin-bottom: 5px; }
+input { 
+    width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 12px; 
+    font-size: 16px; outline: none; transition: 0.3s; box-sizing: border-box;
+}
+input:focus { border-color: var(--verde-primario); }
+
+.hidden { display: none; }
+.alerta-qr { color: #d32f2f; font-weight: bold; font-size: 11px; margin: 10px 0; }
+
+.btn-principal {
+    width: 100%; padding: 15px; background: var(--verde-primario); color: white;
+    border: none; border-radius: 50px; font-weight: bold; font-size: 16px;
+    cursor: pointer; margin-top: 20px; box-shadow: 0 4px 10px rgba(67, 160, 71, 0.3);
+}
+
+.btn-secundario {
+    width: 100%; padding: 10px; background: #fafafa; color: var(--verde-primario);
+    border: 2px solid var(--verde-primario); border-radius: 10px; font-weight: bold;
+}
+
+#msg { margin-top: 20px; padding: 12px; border-radius: 10px; display: none; font-size: 14px; font-weight: 600; }
