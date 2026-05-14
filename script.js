@@ -1,13 +1,11 @@
-let qrValidado = false;
 let html5QrCode;
 
-function iniciarEscaneo() {
+async function iniciarEscaneo() {
     const dniVal = document.getElementById('dni').value;
     if (!dniVal) {
         alert("Por favor, ingrese su DNI.");
         return;
     }
-
     const readerDiv = document.getElementById('reader');
     readerDiv.style.display = 'block';
     
@@ -15,62 +13,67 @@ function iniciarEscaneo() {
     
     html5QrCode.start(
         { facingMode: "environment" }, 
-        { fps: 15, qrbox: 250 },
-        (textoDetectado) => {
-            // ALERTA DE PRUEBA: Si sale este cartel, la cámara funciona.
-            alert("Capturado: " + textoDetectado); 
-
-            const limpio = textoDetectado.toUpperCase().trim();
-            
-            // Acepta guion bajo, medio o incluso espacio
-            if(limpio.includes("GUARDIA")) {
-                qrValidado = true;
-                document.getElementById('acciones').style.display = 'block';
-                document.getElementById('seccion-dni').style.display = 'none';
+        { fps: 20, qrbox: 250 },
+        async (texto) => {
+            const limpio = texto.toUpperCase().trim();
+            // Acepta el guion bajo que generaste para la guardia
+            if(limpio.includes("GUARDIA_COFARMEN") || limpio.includes("GUARDIA-COFARMEN")) {
+                await html5QrCode.stop();
                 document.getElementById('reader').style.display = 'none';
-                document.getElementById('mensaje').innerText = "Validado con éxito.";
-                html5QrCode.stop();
+                determinarYRegistrar(dniVal);
             }
-        },
-        (error) => { /* Escaneando... */ }
-    ).catch((err) => {
-        alert("Error de Hardware/Permisos: " + err);
-    });
+        }
+    ).catch(err => alert("Error de cámara: " + err));
 }
 
-// ... (mantené la función registrarMovimiento igual)
-
-function registrarMovimiento() {
-    const dniU = document.getElementById('dni').value;
-    const evento = document.getElementById('tipo-evento').value;
-
-    navigator.geolocation.getCurrentPosition((pos) => {
-        const payload = {
-            data: [{
-                "fecha y hora": new Date().toLocaleString('es-AR'),
-                "nombre": "Personal Planta",
-                "dni": dniU,
-                "ingreso": (evento === "INGRESO") ? new Date().toLocaleTimeString('es-AR') : "",
-                "inicio de pausa": (evento === "INICIO PAUSA") ? new Date().toLocaleTimeString('es-AR') : "",
-                "fin de pausa": (evento === "REGRESO PAUSA") ? new Date().toLocaleTimeString('es-AR') : "",
-                "egreso": (evento === "EGRESO") ? new Date().toLocaleTimeString('es-AR') : "",
-                "total horas": "", 
-                "distancia": pos.coords.latitude + ", " + pos.coords.longitude
-            }]
+async function determinarYRegistrar(dniU) {
+    const url = 'https://sheetdb.io/api/v1/fV-neQdPCZCPaNbe45TFv8lg7pvmi1GeGcMTn5pyERk';
+    const hoy = new Date().toLocaleDateString('es-AR');
+    
+    try {
+        // Buscamos si el DNI ya tiene registros hoy
+        const res = await fetch(${url}/search?dni=${dniU});
+        const datos = await res.json();
+        const registrosHoy = datos.filter(r => r["fecha y hora"] && r["fecha y hora"].includes(hoy));
+        
+        let payload = {
+            "fecha y hora": new Date().toLocaleString('es-AR'),
+            "nombre": "Personal Planta",
+            "dni": dniU
         };
 
-        fetch('https://sheetdb.io/api/v1/fV-neQdPCZCPaNbe45TFv8lg7pvmi1GeGcMTn5pyERk', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(() => {
-            alert("¡Registro guardado!");
+        // Lógica automática basada en la cantidad de registros
+        if (registrosHoy.length === 0) {
+            payload["ingreso"] = new Date().toLocaleTimeString('es-AR');
+        } else if (registrosHoy.length === 1) {
+            payload["inicio de pausa"] = new Date().toLocaleTimeString('es-AR');
+        } else if (registrosHoy.length === 2) {
+            payload["fin de pausa"] = new Date().toLocaleTimeString('es-AR');
+        } else if (registrosHoy.length === 3) {
+            payload["egreso"] = new Date().toLocaleTimeString('es-AR');
+        } else {
+            alert("Ya se completaron los 4 registros del día.");
             location.reload();
-        })
-        .catch(() => alert("Error de red."));
-    }, () => {
-        alert("Active el GPS para registrarse.");
-    });
+            return;
+        }
+
+        // Obtener ubicación y enviar a SheetDB
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            payload["distancia"] = ${pos.coords.latitude}, ${pos.coords.longitude};
+            
+            const postRes = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: [payload] })
+            });
+
+            if (postRes.ok) {
+                alert("Registro completado con éxito.");
+                location.reload();
+            }
+        }, () => alert("El GPS es obligatorio para registrarse."));
+
+    } catch (e) {
+        alert("Error de conexión con la planilla.");
+    }
 }
