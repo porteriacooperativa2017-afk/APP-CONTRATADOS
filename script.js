@@ -1,6 +1,6 @@
 var html5QrCode = null;
 // Usamos la pestaña Hoja 1 y codificamos el espacio
-var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm?sheet=Hoja%201';
+var urlAPI = 'https://sheetdb.io/api/v1/mbl1f2g0i6wl6';
 
 async function procesarAsistencia() {
     var dniVal = document.getElementById('dni').value;
