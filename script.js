@@ -10,7 +10,7 @@ function iniciarEscaneo() {
     const readerDiv = document.getElementById('reader');
     readerDiv.style.display = 'block';
     
-    // Esta es la configuración exacta que ya te funcionaba para abrir la cámara
+    // RESTAURADO: Motor de cámara que te funcionó anteriormente
     html5QrCode = new Html5Qrcode("reader");
     
     html5QrCode.start(
@@ -18,30 +18,27 @@ function iniciarEscaneo() {
         { fps: 10, qrbox: 250 },
         async (qrCodeMessage) => {
             const limpio = qrCodeMessage.toUpperCase().trim();
-            // Aceptamos tanto el guion bajo como el medio para evitar errores en planta
+            // Acepta guion bajo o medio según el QR que tengas impreso
             if(limpio.includes("GUARDIA_COFARMEN") || limpio.includes("GUARDIA-COFARMEN")) {
                 await html5QrCode.stop();
                 document.getElementById('reader').style.display = 'none';
-                // Ejecutamos la lógica de registro automático
-                registrarAutomatico(dniVal);
+                registrarMovimientoAutomatico(dniVal);
             }
         },
-        (errorMessage) => { /* Escaneando... */ }
+        (errorMessage) => { /* Buscando QR... */ }
     ).catch((err) => {
-        alert("Error de cámara. Asegúrese de dar permisos y usar HTTPS.");
+        alert("Error de cámara: Verifique permisos y conexión HTTPS.");
     });
 }
 
-async function registrarAutomatico(dniU) {
+async function registrarMovimientoAutomatico(dniU) {
     const url = 'https://sheetdb.io/api/v1/fV-neQdPCZCPaNbe45TFv8lg7pvmi1GeGcMTn5pyERk';
     const hoy = new Date().toLocaleDateString('es-AR');
-    
+    document.getElementById('mensaje').innerText = "Procesando...";
+
     try {
-        // Consultamos registros previos para automatizar el estado
         const res = await fetch(${url}/search?dni=${dniU});
         const datos = await res.json();
-        
-        // Filtramos para contar solo los movimientos de hoy
         const registrosHoy = datos.filter(r => r["fecha y hora"] && r["fecha y hora"].includes(hoy));
         
         let payload = {
@@ -50,24 +47,19 @@ async function registrarAutomatico(dniU) {
             "dni": dniU
         };
 
-        // Lógica automática: 1er escaneo=Ingreso, 2do=Pausa, 3ero=Regreso, 4to=Egreso
-        if (registrosHoy.length === 0) {
-            payload["ingreso"] = new Date().toLocaleTimeString('es-AR');
-        } else if (registrosHoy.length === 1) {
-            payload["inicio de pausa"] = new Date().toLocaleTimeString('es-AR');
-        } else if (registrosHoy.length === 2) {
-            payload["fin de pausa"] = new Date().toLocaleTimeString('es-AR');
-        } else if (registrosHoy.length === 3) {
-            payload["egreso"] = new Date().toLocaleTimeString('es-AR');
-        } else {
-            alert("Ya se completaron los registros diarios para este DNI.");
+        // Lógica de 4 pasos automática para tu planilla
+        if (registrosHoy.length === 0) payload["ingreso"] = new Date().toLocaleTimeString('es-AR');
+        else if (registrosHoy.length === 1) payload["inicio de pausa"] = new Date().toLocaleTimeString('es-AR');
+        else if (registrosHoy.length === 2) payload["fin de pausa"] = new Date().toLocaleTimeString('es-AR');
+        else if (registrosHoy.length === 3) payload["egreso"] = new Date().toLocaleTimeString('es-AR');
+        else {
+            alert("Ya completó los registros de hoy.");
             location.reload();
             return;
         }
 
-        // Captura de ubicación obligatoria para Cofarmen
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            payload["distancia"] = pos.coords.latitude + ", " + pos.coords.longitude;
+            payload["distancia"] = ${pos.coords.latitude}, ${pos.coords.longitude};
             
             await fetch(url, {
                 method: 'POST',
@@ -75,13 +67,11 @@ async function registrarAutomatico(dniU) {
                 body: JSON.stringify({ data: [payload] })
             });
 
-            alert("Registro automático guardado con éxito.");
+            alert("Registro guardado con éxito en la planilla.");
             location.reload();
-        }, () => {
-            alert("Debe activar el GPS para registrar su movimiento.");
-        });
+        }, () => alert("GPS obligatorio para registrar ubicación en Mendoza."));
 
     } catch (e) {
-        alert("Error al conectar con la planilla de registros.");
+        alert("Error de conexión con SheetDB.");
     }
 }
