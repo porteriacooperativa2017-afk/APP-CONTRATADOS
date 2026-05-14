@@ -1,6 +1,6 @@
 var html5QrCode = null;
-// Forzamos a SheetDB a usar la Hoja 1
-var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm?sheet=Hoja 1';
+// Codificación exacta: Hoja%201 para que SheetDB no se pierda
+var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm?sheet=Hoja%201';
 
 async function procesarAsistencia() {
     var dniVal = document.getElementById('dni').value;
@@ -13,7 +13,7 @@ async function procesarAsistencia() {
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
-        // Búsqueda exacta en Hoja 1 por la columna DNI
+        // Buscamos específicamente en la Hoja 1
         var respuesta = await fetch(urlAPI + "&DNI=" + dniVal); 
         var datos = await respuesta.json();
         
@@ -54,7 +54,7 @@ function iniciarEscaneo(dniU, cuenta) {
 
 function enviarDatosCofarmen(dniU, cuenta) {
     var mov = "";
-    // Nombres exactos de la Hoja 1 (Imagen 1000330598.jpg)
+    // Nombres exactos de la imagen 1000330598.jpg
     if (cuenta === 0) mov = "Ingreso";
     else if (cuenta === 1) mov = "Inicio Pausa";
     else if (cuenta === 2) mov = "Fin Pausa";
@@ -63,25 +63,26 @@ function enviarDatosCofarmen(dniU, cuenta) {
     navigator.geolocation.getCurrentPosition(async function(pos) {
         var ahora = new Date();
         
-        // El objeto DEBE tener las mismas mayúsculas que tu planilla verde
-        var fila = {
+        // Construcción del objeto con los nombres de la imagen 1000330598.jpg
+        var registroFinal = {
             "Fecha": ahora.toLocaleDateString('es-AR'),
             "Nombre": "PERSONAL PLANTA", 
             "DNI": dniU,
             "Distancia": pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6)
         };
         
-        fila[mov] = ahora.toLocaleTimeString('es-AR');
+        // Asignamos la hora a la columna correcta
+        registroFinal[mov] = ahora.toLocaleTimeString('es-AR');
 
         try {
             var res = await fetch(urlAPI, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ "data": [fila] })
+                body: JSON.stringify({ "data": [registroFinal] })
             });
 
             if (res.ok) {
-                alert("REGISTRO DE " + mov.toUpperCase() + " GUARDADO EN HOJA 1");
+                alert("REGISTRO DE " + mov.toUpperCase() + " GUARDADO EXITOSAMENTE");
                 location.reload();
             }
         } catch (e) { alert("ERROR AL GUARDAR"); }
