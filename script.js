@@ -4,31 +4,39 @@ let html5QrCode;
 function iniciarEscaneo() {
     const dniVal = document.getElementById('dni').value;
     if (!dniVal) {
-        alert("Por favor, ingrese su DNI.");
+        alert("Por favor, ingrese su DNI antes de validar.");
         return;
     }
 
     const readerDiv = document.getElementById('reader');
     readerDiv.style.display = 'block';
     
+    // Configuramos el lector con mayor sensibilidad
     html5QrCode = new Html5Qrcode("reader");
     
+    const config = { 
+        fps: 20, // Más frames por segundo para capturar rápido
+        qrbox: { width: 280, height: 280 }, // Cuadro de escaneo más grande
+        aspectRatio: 1.0 
+    };
+
     html5QrCode.start(
         { facingMode: "environment" }, 
-        { fps: 10, qrbox: 250 },
-        (mensaje) => {
-            if(mensaje === "GUARDIA-COFARMEN") {
+        config,
+        (textoDetectado) => {
+            // Convertimos a mayúsculas para evitar errores de coincidencia
+            if(textoDetectado.toUpperCase().trim() === "GUARDIA-COFARMEN") {
                 qrValidado = true;
                 document.getElementById('acciones').style.display = 'block';
                 document.getElementById('seccion-dni').style.display = 'none';
                 document.getElementById('reader').style.display = 'none';
-                document.getElementById('mensaje').innerText = "QR OK. Elija movimiento.";
-                html5QrCode.stop();
+                document.getElementById('mensaje').innerText = "QR Validado.";
+                document.getElementById('mensaje').style.color = "green";
+                html5QrCode.stop().catch(err => console.error(err));
             }
-        },
-        (error) => { /* buscando qr... */ }
+        }
     ).catch((err) => {
-        alert("Error de cámara: Verifique permisos de navegador.");
+        alert("Error al iniciar cámara: " + err);
     });
 }
 
