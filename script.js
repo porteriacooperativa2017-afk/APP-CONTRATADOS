@@ -1,6 +1,6 @@
 // Variable para el control de la cámara
 var html5QrCode = null;
-var urlAPI = 'https://sheetdb.io/api/v1/fV-neQdPCZCPaNbe45TFv8lg7pvmi1GeGcMTn5pyERk';
+var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
 
 // 1. Función principal del botón
 async function procesarAsistencia() {
