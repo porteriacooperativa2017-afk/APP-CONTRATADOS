@@ -1,100 +1,84 @@
 var html5QrCode = null;
-// Mantenemos tu API original
 var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
-// Forzamos Hoja 1. OJO: Si tu pestaña se llama "Hoja 1" (con espacio), debe ir Hoja%201
-var nombreHoja = 'Hoja%201'; 
 
 async function procesarAsistencia() {
     var dniVal = document.getElementById('dni').value;
     var pinVal = document.getElementById('pin').value;
 
     if (!dniVal || !pinVal) {
-        alert("Complete DNI y PIN");
+        alert("Falta DNI o PIN");
         return;
     }
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
-        // Agregamos el parámetro de la hoja también en la búsqueda
-        var urlBusqueda = urlBase + "/search?DNI=" + dniVal + "&Fecha=" + hoy + "&sheet=" + nombreHoja;
         
-        var respuesta = await fetch(urlBusqueda); 
-        var datos = await respuesta.json();
+        // BUSQUEDA FORZADA: Le decimos explícitamente que mire la Hoja 1
+        var res = await fetch(urlBase + "/search?DNI=" + dniVal + "&Fecha=" + hoy + "&sheet=Hoja 1");
+        var datos = await res.json();
         
-        if (!Array.isArray(datos)) {
-            throw new Error("Respuesta de API inválida");
-        }
-
         var cantidad = datos.length;
 
         if (cantidad === 0 || cantidad === 3) {
             gestionarEnvio(dniVal, cantidad);
         } else {
-            alert("VALIDACIÓN EN GUARDIA REQUERIDA");
+            alert("ESCANEE QR EN GUARDIA");
             iniciarEscaneo(dniVal, cantidad);
         }
-    } catch (error) {
-        alert("ERROR EN BÚSQUEDA: " + error.message);
+    } catch (e) {
+        alert("Error de conexión");
     }
 }
 
 function gestionarEnvio(dniU, cuenta) {
-    var mov = "";
-    if (cuenta === 0) mov = "Ingreso";
-    else if (cuenta === 1) mov = "Inicio Pausa";
-    else if (cuenta === 2) mov = "Fin Pausa";
-    else if (cuenta === 3) mov = "Egreso";
+    // Nombres extraídos EXACTAMENTE de tu foto 1000330598.jpg
+    var mov = (cuenta === 0) ? "Ingreso" : (cuenta === 1) ? "Inicio Pausa" : (cuenta === 2) ? "Fin Pausa" : "Egreso";
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
         var ahora = new Date();
-        var hoy = ahora.toLocaleDateString('es-AR');
+        var fechaHoy = ahora.toLocaleDateString('es-AR');
         var horaActual = ahora.toLocaleTimeString('es-AR');
-        var coords = pos.coords.latitude.toFixed(4) + ", " + pos.coords.longitude.toFixed(4);
-        
+        var gps = pos.coords.latitude.toFixed(5) + "," + pos.coords.longitude.toFixed(5);
+
         var urlFinal = "";
         var metodo = "";
-        var cuerpo = { "data": {} };
+        var bodyData = { "data": {} };
 
         if (cuenta === 0) {
-            // POST: Crear fila nueva
+            // POST: Creamos la fila
             metodo = 'POST';
-            urlFinal = urlBase + "?sheet=" + nombreHoja;
-            cuerpo.data = [{
-                "Fecha": hoy,
-                "Nombre": "Diego Olivares",
+            urlFinal = urlBase + "?sheet=Hoja 1";
+            bodyData.data = [{
+                "Fecha": fechaHoy,
+                "Nombre": "Diego Olivares", // Tu nombre según sistema
                 "DNI": dniU,
                 "Ingreso": horaActual,
-                "Distancia": coords
+                "Distancia": gps
             }];
         } else {
-            // PATCH: Actualizar fila existente
+            // PATCH: Actualizamos la fila de hoy
             metodo = 'PATCH';
-            // Filtramos por DNI y Fecha para asegurar que sea la fila de hoy
-            urlFinal = urlBase + "/DNI/" + dniU + "?sheet=" + nombreHoja + "&Fecha=" + hoy;
-            cuerpo.data[mov] = horaActual;
-            cuerpo.data["Distancia"] = coords;
+            // Esta es la ruta que SheetDB exige para no fallar:
+            urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
+            bodyData.data[mov] = horaActual;
+            bodyData.data["Distancia"] = gps;
         }
 
         try {
-            var res = await fetch(urlFinal, {
+            var response = await fetch(urlFinal, {
                 method: metodo,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(cuerpo)
+                body: JSON.stringify(bodyData)
             });
 
-            var resultadoTexto = await res.text();
-
-            if (res.ok) {
-                alert("REGISTRO EXITOSO: " + mov.toUpperCase());
+            if (response.ok) {
+                alert("GUARDADO EXITOSO EN HOJA 1: " + mov);
                 location.reload();
             } else {
-                // Si la API rechaza el dato, nos dirá por qué (ej: columna no encontrada)
-                alert("LA PLANILLA RECHAZÓ EL DATO: " + resultadoTexto);
+                alert("Error: La planilla no aceptó el dato.");
             }
-        } catch (e) {
-            alert("ERROR DE RED: No se pudo llegar a la planilla.");
+        } catch (err) {
+            alert("Error de red");
         }
-    }, function() { alert("GPS OBLIGATORIO"); });
+    });
 }
-
-// ... (funciones de QR se mantienen igual)
