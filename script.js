@@ -1,90 +1,87 @@
-var html5QrCode = null;
-// Usamos el ID de la hoja para que SheetDB no tenga dudas de dónde escribir
-var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm?sheet=Hoja 1';
+let html5QrCode;
 
-async function procesarAsistencia() {
-    var dniVal = document.getElementById('dni').value;
-    var pinVal = document.getElementById('pin').value;
-
-    if (!dniVal || !pinVal) {
-        alert("Complete DNI y PIN");
+function iniciarEscaneo() {
+    const dniVal = document.getElementById('dni').value;
+    if (!dniVal) {
+        alert("Por favor, ingrese su DNI.");
         return;
     }
 
-    try {
-        var hoy = new Date().toLocaleDateString('es-AR');
-        // Búsqueda forzada en Hoja 1
-        var respuesta = await fetch(urlAPI + "&DNI=" + dniVal); 
-        var datos = await respuesta.json();
-        
-        var registrosHoy = datos.filter(function(item) {
-            return item["Fecha"] && item["Fecha"].includes(hoy);
-        });
-
-        var cantidad = registrosHoy.length;
-
-        if (cantidad === 0 || cantidad === 3) {
-            enviarDatosCofarmen(dniVal, cantidad);
-        } else {
-            alert("ACCION PROTEGIDA: ESCANEE QR EN GUARDIA");
-            iniciarEscaneo(dniVal, cantidad);
-        }
-    } catch (error) {
-        alert("ERROR DE CONEXIÓN CON HOJA 1");
-    }
-}
-
-function iniciarEscaneo(dniU, cuenta) {
-    var zona = document.getElementById('reader');
-    zona.style.display = 'block';
+    const readerDiv = document.getElementById('reader');
+    readerDiv.style.display = 'block';
+    
+    // Esta es la configuración exacta que ya te funcionaba para abrir la cámara
     html5QrCode = new Html5Qrcode("reader");
     
     html5QrCode.start(
         { facingMode: "environment" }, 
         { fps: 10, qrbox: 250 },
-        async function(texto) {
-            if (texto.toUpperCase().includes("GUARDIA")) {
+        async (qrCodeMessage) => {
+            const limpio = qrCodeMessage.toUpperCase().trim();
+            // Aceptamos tanto el guion bajo como el medio para evitar errores en planta
+            if(limpio.includes("GUARDIA_COFARMEN") || limpio.includes("GUARDIA-COFARMEN")) {
                 await html5QrCode.stop();
-                zona.style.display = 'none';
-                enviarDatosCofarmen(dniU, cuenta);
+                document.getElementById('reader').style.display = 'none';
+                // Ejecutamos la lógica de registro automático
+                registrarAutomatico(dniVal);
             }
-        }
-    ).catch(function(err) { alert("ERROR DE CÁMARA"); });
+        },
+        (errorMessage) => { /* Escaneando... */ }
+    ).catch((err) => {
+        alert("Error de cámara. Asegúrese de dar permisos y usar HTTPS.");
+    });
 }
 
-function enviarDatosCofarmen(dniU, cuenta) {
-    var movCol = "";
-    // Nombres idénticos a la imagen 1000330598.jpg
-    if (cuenta === 0) movCol = "Ingreso";
-    else if (cuenta === 1) movCol = "Inicio Pausa";
-    else if (cuenta === 2) movCol = "Fin Pausa";
-    else if (cuenta === 3) movCol = "Egreso";
-
-    navigator.geolocation.getCurrentPosition(async function(pos) {
-        var ahora = new Date();
+async function registrarAutomatico(dniU) {
+    const url = 'https://sheetdb.io/api/v1/fV-neQdPCZCPaNbe45TFv8lg7pvmi1GeGcMTn5pyERk';
+    const hoy = new Date().toLocaleDateString('es-AR');
+    
+    try {
+        // Consultamos registros previos para automatizar el estado
+        const res = await fetch(${url}/search?dni=${dniU});
+        const datos = await res.json();
         
-        // Objeto construido basándome estrictamente en la foto 1000330598.jpg
-        var dataPayload = {
-            "Fecha": ahora.toLocaleDateString('es-AR'),
-            "Nombre": "PERSONAL PLANTA", 
-            "DNI": dniU,
-            "Distancia": pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6)
+        // Filtramos para contar solo los movimientos de hoy
+        const registrosHoy = datos.filter(r => r["fecha y hora"] && r["fecha y hora"].includes(hoy));
+        
+        let payload = {
+            "fecha y hora": new Date().toLocaleString('es-AR'),
+            "nombre": "Personal Planta",
+            "dni": dniU
         };
-        
-        // Agregamos la hora al movimiento que toca
-        dataPayload[movCol] = ahora.toLocaleTimeString('es-AR');
 
-        try {
-            var res = await fetch(urlAPI, {
+        // Lógica automática: 1er escaneo=Ingreso, 2do=Pausa, 3ero=Regreso, 4to=Egreso
+        if (registrosHoy.length === 0) {
+            payload["ingreso"] = new Date().toLocaleTimeString('es-AR');
+        } else if (registrosHoy.length === 1) {
+            payload["inicio de pausa"] = new Date().toLocaleTimeString('es-AR');
+        } else if (registrosHoy.length === 2) {
+            payload["fin de pausa"] = new Date().toLocaleTimeString('es-AR');
+        } else if (registrosHoy.length === 3) {
+            payload["egreso"] = new Date().toLocaleTimeString('es-AR');
+        } else {
+            alert("Ya se completaron los registros diarios para este DNI.");
+            location.reload();
+            return;
+        }
+
+        // Captura de ubicación obligatoria para Cofarmen
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            payload["distancia"] = pos.coords.latitude + ", " + pos.coords.longitude;
+            
+            await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ "data": [dataPayload] })
+                body: JSON.stringify({ data: [payload] })
             });
 
-            if (res.ok) {
-                alert("REGISTRO DE " + movCol.toUpperCase() + " GUARDADO EN HOJA 1");
-                location.reload();
-            }
-        } catch (e) { alert("ERROR AL GUARDAR"); }
-    }, function() { alert("GPS OBLIGATORIO"); });
+            alert("Registro automático guardado con éxito.");
+            location.reload();
+        }, () => {
+            alert("Debe activar el GPS para registrar su movimiento.");
+        });
+
+    } catch (e) {
+        alert("Error al conectar con la planilla de registros.");
+    }
 }
