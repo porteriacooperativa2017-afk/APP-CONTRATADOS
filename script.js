@@ -13,25 +13,59 @@ async function procesarAsistencia() {
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
         
-        // BUSQUEDA FORZADA: Le decimos explícitamente que mire la Hoja 1
-        var res = await fetch(urlBase + "/search?DNI=" + dniVal + "&Fecha=" + hoy + "&sheet=Hoja 1");
+        // Simplificamos la búsqueda para evitar el "Error de conexión"
+        // Buscamos en Hoja 1 los registros de este DNI
+        var res = await fetch(urlBase + "/search?DNI=" + dniVal + "&sheet=Hoja 1");
         var datos = await res.json();
         
-        var cantidad = datos.length;
+        // Filtramos manualmente los de hoy para mayor seguridad
+        var registrosHoy = datos.filter(function(fila) {
+            return fila.Fecha === hoy;
+        });
+        
+        var cantidad = registrosHoy.length;
 
+        // Si no hay nada hoy (Ingreso) o ya hay 3 (Egreso), va directo.
+        // Si hay 1 o 2, es Pausa y pide QR.
         if (cantidad === 0 || cantidad === 3) {
             gestionarEnvio(dniVal, cantidad);
         } else {
-            alert("ESCANEE QR EN GUARDIA");
+            alert("REGISTRO DE PAUSA: ESCANEE QR DE GUARDIA");
             iniciarEscaneo(dniVal, cantidad);
         }
     } catch (e) {
-        alert("Error de conexión");
+        alert("ERROR DE SINCRONIZACIÓN: Reintente en un instante.");
+        console.log(e);
     }
 }
 
+function iniciarEscaneo(dniU, cuenta) {
+    var zona = document.getElementById('reader');
+    zona.style.display = 'block';
+    
+    // Si ya había una instancia, la limpiamos para evitar errores
+    if (html5QrCode) {
+        html5QrCode.clear();
+    }
+    
+    html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+        { facingMode: "environment" }, 
+        { fps: 10, qrbox: 250 },
+        async function(texto) {
+            // Validamos que el QR sea el correcto
+            if (texto.toUpperCase().includes("GUARDIA")) {
+                await html5QrCode.stop();
+                zona.style.display = 'none';
+                gestionarEnvio(dniU, cuenta);
+            }
+        }
+    ).catch(function(err) { 
+        alert("ERROR DE CÁMARA: Asegúrese de dar permisos."); 
+    });
+}
+
 function gestionarEnvio(dniU, cuenta) {
-    // Nombres extraídos EXACTAMENTE de tu foto 1000330598.jpg
     var mov = (cuenta === 0) ? "Ingreso" : (cuenta === 1) ? "Inicio Pausa" : (cuenta === 2) ? "Fin Pausa" : "Egreso";
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
@@ -45,20 +79,18 @@ function gestionarEnvio(dniU, cuenta) {
         var bodyData = { "data": {} };
 
         if (cuenta === 0) {
-            // POST: Creamos la fila
             metodo = 'POST';
             urlFinal = urlBase + "?sheet=Hoja 1";
             bodyData.data = [{
                 "Fecha": fechaHoy,
-                "Nombre": "Diego Olivares", // Tu nombre según sistema
+                "Nombre": "Diego Olivares",
                 "DNI": dniU,
                 "Ingreso": horaActual,
                 "Distancia": gps
             }];
         } else {
-            // PATCH: Actualizamos la fila de hoy
             metodo = 'PATCH';
-            // Esta es la ruta que SheetDB exige para no fallar:
+            // Para la pausa/egreso, filtramos por DNI y Fecha en Hoja 1
             urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
             bodyData.data[mov] = horaActual;
             bodyData.data["Distancia"] = gps;
@@ -72,13 +104,15 @@ function gestionarEnvio(dniU, cuenta) {
             });
 
             if (response.ok) {
-                alert("GUARDADO EXITOSO EN HOJA 1: " + mov);
+                alert("REGISTRO EXITOSO: " + mov.toUpperCase());
                 location.reload();
             } else {
-                alert("Error: La planilla no aceptó el dato.");
+                alert("LA PLANILLA NO RESPONDE. REINTENTE.");
             }
         } catch (err) {
-            alert("Error de red");
+            alert("ERROR DE RED AL GUARDAR");
         }
+    }, function() { 
+        alert("EL GPS ES NECESARIO PARA MARCAR"); 
     });
 }
