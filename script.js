@@ -1,36 +1,38 @@
 var html5QrCode = null;
+// API vinculada a tu planilla de Cofarmen
 var urlAPI = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
 
 async function procesarAsistencia() {
-    var dniInput = document.getElementById('dni').value;
-    var pinInput = document.getElementById('pin').value;
+    var dniVal = document.getElementById('dni').value;
+    var pinVal = document.getElementById('pin').value;
 
-    if (!dniInput || !pinInput) {
+    if (!dniVal || !pinVal) {
         alert("Complete DNI y PIN");
         return;
     }
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
-        // Buscamos usando "DNI" exactamente como está en la foto
-        var respuesta = await fetch(urlAPI + "/search?DNI=" + dniInput);
+        // BUSQUEDA: Busca en la Hoja 1 usando la columna "DNI"
+        var respuesta = await fetch(urlAPI + "/search?DNI=" + dniVal);
         var datos = await respuesta.json();
         
-        // Filtramos por la columna "Fecha" (primera en mayúscula)
+        // Filtra los registros de hoy usando la columna "Fecha"
         var registrosHoy = datos.filter(function(item) {
             return item["Fecha"] && item["Fecha"].includes(hoy);
         });
 
         var cantidad = registrosHoy.length;
 
+        // LOGICA: 0 (Ingreso) y 3 (Egreso) son directos. 1 y 2 (Pausas) requieren QR.
         if (cantidad === 0 || cantidad === 3) {
-            enviarDatosCofarmen(dniInput, cantidad);
+            enviarDatosCofarmen(dniVal, cantidad);
         } else {
             alert("EL REGISTRO DE PAUSA REQUIERE ESCANEO EN GUARDIA");
-            iniciarEscaneo(dniInput, cantidad);
+            iniciarEscaneo(dniVal, cantidad);
         }
     } catch (error) {
-        alert("ERROR DE CONEXIÓN CON LA PLANILLA");
+        alert("ERROR DE CONEXIÓN CON LA HOJA 1");
     }
 }
 
@@ -53,23 +55,24 @@ function iniciarEscaneo(dniU, cuenta) {
 }
 
 function enviarDatosCofarmen(dniU, cuenta) {
-    var movimiento = "";
-    // Nombres exactos según la foto 1000330598.jpg
-    if (cuenta === 0) movimiento = "Ingreso";
-    else if (cuenta === 1) movimiento = "Inicio Pausa";
-    else if (cuenta === 2) movimiento = "Fin Pausa";
-    else if (cuenta === 3) movimiento = "Egreso";
+    var mov = "";
+    // Nombres de columna exactos según la imagen 1000330598.jpg
+    if (cuenta === 0) mov = "Ingreso";
+    else if (cuenta === 1) mov = "Inicio Pausa";
+    else if (cuenta === 2) mov = "Fin Pausa";
+    else if (cuenta === 3) mov = "Egreso";
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
         var ahora = new Date();
+        // REGISTRO: Envía los datos para crear una nueva fila en la Hoja 1
         var fila = {
             "Fecha": ahora.toLocaleDateString('es-AR'),
-            "Nombre": "Personal Planta",
+            "Nombre": "PERSONAL PLANTA", // Aquí podrías vincular el nombre real si lo tenés
             "DNI": dniU,
             "Distancia": pos.coords.latitude + ", " + pos.coords.longitude
         };
         
-        fila[movimiento] = ahora.toLocaleTimeString('es-AR');
+        fila[mov] = ahora.toLocaleTimeString('es-AR');
 
         try {
             var res = await fetch(urlAPI, {
@@ -79,7 +82,7 @@ function enviarDatosCofarmen(dniU, cuenta) {
             });
 
             if (res.ok) {
-                alert("REGISTRO DE " + movimiento.toUpperCase() + " EXITOSO");
+                alert("REGISTRO DE " + mov.toUpperCase() + " EXITOSO EN HOJA 1");
                 location.reload();
             }
         } catch (e) { alert("ERROR AL GUARDAR"); }
