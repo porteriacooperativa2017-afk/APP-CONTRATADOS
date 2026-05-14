@@ -6,7 +6,7 @@ async function procesarAsistencia() {
     const pin = document.getElementById('pin').value;
 
     if (!dni || !pin) {
-        alert("Por favor, complete DNI y PIN.");
+        alert("Por favor, ingrese DNI y PIN.");
         return;
     }
 
@@ -14,39 +14,40 @@ async function procesarAsistencia() {
         const hoy = new Date().toLocaleDateString('es-AR');
         const res = await fetch(${urlAPI}/search?dni=${dni});
         const datos = await res.json();
+        
+        // Identificar movimientos del día
         const registrosHoy = datos.filter(r => r["fecha y hora"] && r["fecha y hora"].includes(hoy));
+        const cantidad = registrosHoy.length;
 
-        // LÓGICA:
-        // 0 registros = INGRESO (Directo)
-        // 1 o 2 registros = PAUSAS (Requiere QR)
-        // 3 registros = EGRESO (Directo)
-
-        if (registrosHoy.length === 0 || registrosHoy.length === 3) {
-            enviarDatos(dni, registrosHoy.length);
+        // Lógica: 0 (Ingreso) y 3 (Egreso) son directos. 1 y 2 (Pausas) requieren QR.
+        if (cantidad === 0 || cantidad === 3) {
+            enviarDatos(dni, cantidad);
         } else {
-            alert("Este movimiento requiere escaneo de QR en Guardia.");
-            iniciarEscaneoQR(dni, registrosHoy.length);
+            alert("Para registrar la pausa debe escanear el QR en Guardia.");
+            iniciarEscaneoSeguridad(dni, cantidad);
         }
     } catch (e) {
-        alert("Error al conectar con el sistema.");
+        alert("Error al conectar con la base de datos de MOVIMIENTOS.");
     }
 }
 
-function iniciarEscaneoQR(dni, cantidad) {
-    document.getElementById('reader').style.display = 'block';
+function iniciarEscaneoSeguridad(dni, cantidad) {
+    const readerDiv = document.getElementById('reader');
+    readerDiv.style.display = 'block';
+    
     html5QrCode = new Html5Qrcode("reader");
     
     html5QrCode.start(
         { facingMode: "environment" }, 
         { fps: 10, qrbox: 250 },
-        async (texto) => {
-            if(texto.toUpperCase().includes("GUARDIA")) {
+        async (codigo) => {
+            if(codigo.toUpperCase().includes("GUARDIA")) {
                 await html5QrCode.stop();
-                document.getElementById('reader').style.display = 'none';
+                readerDiv.style.display = 'none';
                 enviarDatos(dni, cantidad);
             }
         }
-    ).catch(err => alert("Error de cámara. Verifique permisos."));
+    ).catch(err => alert("Error al activar la cámara."));
 }
 
 function enviarDatos(dni, cantidad) {
@@ -74,8 +75,8 @@ function enviarDatos(dni, cantidad) {
         });
 
         if (response.ok) {
-            alert("Movimiento registrado con éxito.");
+            alert("Movimiento registrado: " + columna.toUpperCase());
             location.reload();
         }
-    }, () => alert("GPS obligatorio para registrar asistencia."));
+    }, () => alert("El uso de GPS es obligatorio para registrarse en Cofarmen."));
 }
