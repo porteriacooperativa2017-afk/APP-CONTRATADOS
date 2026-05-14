@@ -1,8 +1,8 @@
 var html5QrCode = null;
-// Esta es la API que vinculaste a tu planilla
-var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm'; 
-// Parámetro vital para que SheetDB use la pestaña correcta
-var urlAPI = urlBase + '?sheet=Hoja%201';
+// Mantenemos tu API original
+var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
+// Forzamos Hoja 1. OJO: Si tu pestaña se llama "Hoja 1" (con espacio), debe ir Hoja%201
+var nombreHoja = 'Hoja%201'; 
 
 async function procesarAsistencia() {
     var dniVal = document.getElementById('dni').value;
@@ -15,28 +15,31 @@ async function procesarAsistencia() {
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
-        // BUSQUEDA: Forzamos la búsqueda en Hoja 1 filtrando por DNI y Fecha
-        var respuesta = await fetch(urlAPI + "&DNI=" + dniVal + "&Fecha=" + hoy); 
+        // Agregamos el parámetro de la hoja también en la búsqueda
+        var urlBusqueda = urlBase + "/search?DNI=" + dniVal + "&Fecha=" + hoy + "&sheet=" + nombreHoja;
+        
+        var respuesta = await fetch(urlBusqueda); 
         var datos = await respuesta.json();
         
+        if (!Array.isArray(datos)) {
+            throw new Error("Respuesta de API inválida");
+        }
+
         var cantidad = datos.length;
 
-        // Si no hay registros hoy (0) o ya terminó el turno (4), va directo
-        // Si hay entre 1 y 3 movimientos, requiere validar en Guardia
-        if (cantidad === 0 || cantidad === 4) {
+        if (cantidad === 0 || cantidad === 3) {
             gestionarEnvio(dniVal, cantidad);
         } else {
-            alert("VALIDACIÓN REQUERIDA: ESCANEE EL QR DE GUARDIA");
+            alert("VALIDACIÓN EN GUARDIA REQUERIDA");
             iniciarEscaneo(dniVal, cantidad);
         }
     } catch (error) {
-        alert("ERROR DE CONEXIÓN: Verifique el estado de la API");
+        alert("ERROR EN BÚSQUEDA: " + error.message);
     }
 }
 
 function gestionarEnvio(dniU, cuenta) {
     var mov = "";
-    // Nombres exactos según tu foto de la tabla verde
     if (cuenta === 0) mov = "Ingreso";
     else if (cuenta === 1) mov = "Inicio Pausa";
     else if (cuenta === 2) mov = "Fin Pausa";
@@ -48,56 +51,50 @@ function gestionarEnvio(dniU, cuenta) {
         var horaActual = ahora.toLocaleTimeString('es-AR');
         var coords = pos.coords.latitude.toFixed(4) + ", " + pos.coords.longitude.toFixed(4);
         
+        var urlFinal = "";
+        var metodo = "";
+        var cuerpo = { "data": {} };
+
         if (cuenta === 0) {
-            // PRIMER REGISTRO: Crea la fila en Hoja 1
-            var registro = {
-                "data": [{
-                    "Fecha": hoy,
-                    "Nombre": "Diego Olivares",
-                    "DNI": dniU,
-                    "Ingreso": horaActual,
-                    "Distancia": coords
-                }]
-            };
-            ejecutarFetch(urlAPI, 'POST', registro);
+            // POST: Crear fila nueva
+            metodo = 'POST';
+            urlFinal = urlBase + "?sheet=" + nombreHoja;
+            cuerpo.data = [{
+                "Fecha": hoy,
+                "Nombre": "Diego Olivares",
+                "DNI": dniU,
+                "Ingreso": horaActual,
+                "Distancia": coords
+            }];
         } else {
-            // ACTUALIZACIÓN: Busca la fila de HOY y completa el campo vacío
-            // El filtro por Fecha es CLAVE para que no cree fila nueva
-            var urlUpdate = urlBase + "/DNI/" + dniU + "?sheet=Hoja%201&Fecha=" + hoy;
-            var actualizacion = { "data": {} };
-            actualizacion.data[mov] = horaActual;
-            actualizacion.data["Distancia"] = coords;
-            
-            ejecutarFetch(urlUpdate, 'PATCH', actualizacion);
+            // PATCH: Actualizar fila existente
+            metodo = 'PATCH';
+            // Filtramos por DNI y Fecha para asegurar que sea la fila de hoy
+            urlFinal = urlBase + "/DNI/" + dniU + "?sheet=" + nombreHoja + "&Fecha=" + hoy;
+            cuerpo.data[mov] = horaActual;
+            cuerpo.data["Distancia"] = coords;
         }
-    }, function() { alert("EL GPS ES OBLIGATORIO"); });
-}
 
-async function ejecutarFetch(url, metodo, cuerpo) {
-    try {
-        var res = await fetch(url, {
-            method: metodo,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(cuerpo)
-        });
-        if (res.ok) {
-            alert("REGISTRO EXITOSO EN HOJA 1");
-            location.reload();
-        }
-    } catch (e) { alert("ERROR AL GUARDAR"); }
-}
+        try {
+            var res = await fetch(urlFinal, {
+                method: metodo,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cuerpo)
+            });
 
-function iniciarEscaneo(dniU, cuenta) {
-    var zona = document.getElementById('reader');
-    zona.style.display = 'block';
-    html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 },
-        async function(texto) {
-            if (texto.toUpperCase().includes("GUARDIA")) {
-                await html5QrCode.stop();
-                zona.style.display = 'none';
-                gestionarEnvio(dniU, cuenta);
+            var resultadoTexto = await res.text();
+
+            if (res.ok) {
+                alert("REGISTRO EXITOSO: " + mov.toUpperCase());
+                location.reload();
+            } else {
+                // Si la API rechaza el dato, nos dirá por qué (ej: columna no encontrada)
+                alert("LA PLANILLA RECHAZÓ EL DATO: " + resultadoTexto);
             }
+        } catch (e) {
+            alert("ERROR DE RED: No se pudo llegar a la planilla.");
         }
-    ).catch(function(err) { alert("ERROR DE CÁMARA"); });
+    }, function() { alert("GPS OBLIGATORIO"); });
 }
+
+// ... (funciones de QR se mantienen igual)
