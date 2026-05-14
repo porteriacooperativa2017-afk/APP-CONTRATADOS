@@ -1,35 +1,75 @@
+let qrValidado = false;
 let html5QrCode;
 
 function iniciarEscaneo() {
-    const dniVal = document.getElementById('dni').value;
-    if (!dniVal) {
-        alert("Por favor, ingrese su DNI.");
-        return;
-    }
     const readerDiv = document.getElementById('reader');
     readerDiv.style.display = 'block';
-    
-    // Volvemos a la configuración simple que te funcionó al principio
     html5QrCode = new Html5Qrcode("reader");
     
     html5QrCode.start(
         { facingMode: "environment" }, 
-        { fps: 10, qrbox: 250 },
-        async (texto) => {
-            const limpio = texto.toUpperCase().trim();
-            // Aceptamos cualquier variante de tu QR de guardia
-            if(limpio.includes("GUARDIA")) {
-                await html5QrCode.stop();
-                document.getElementById('reader').style.display = 'none';
-                // Ejecutamos el registro automático
-                registrarAutomatico(dniVal);
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (qrCodeMessage) => {
+            if(qrCodeMessage === "GUARDIA-COFARMEN") {
+                qrValidado = true;
+                document.getElementById('acciones').style.display = 'block';
+                document.getElementById('seccion-dni').style.display = 'none';
+                readerDiv.style.display = 'none';
+                document.getElementById('mensaje').innerText = "QR Validado Correctamente.";
+                html5QrCode.stop();
             }
-        }
-    ).catch(err => {
-        alert("Error: Verifique permisos de cámara en el navegador.");
+        },
+        (errorMessage) => { /* Escaneando... */ }
+    ).catch((err) => {
+        alert("Error al iniciar cámara. Verifique permisos.");
+        console.error(err);
     });
 }
 
+function registrarMovimiento() {
+    const dniU = document.getElementById('dni').value;
+    const evento = document.getElementById('tipo-evento').value;
+
+    if (!dniU || !qrValidado) {
+        alert("Falta DNI o validación de QR.");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition((pos) => {
+        const payload = {
+            data: [{
+                "fecha y hora": new Date().toLocaleString('es-AR'),
+                "nombre": "Personal Cofarmen",
+                "dni": dniU,
+                "ingreso": (evento === "INGRESO") ? new Date().toLocaleTimeString('es-AR') : "",
+                "inicio de pausa": (evento === "INICIO PAUSA") ? new Date().toLocaleTimeString('es-AR') : "",
+                "fin de pausa": (evento === "REGRESO PAUSA") ? new Date().toLocaleTimeString('es-AR') : "",
+                "egreso": (evento === "EGRESO") ? new Date().toLocaleTimeString('es-AR') : "",
+                "total horas": "",
+                "distancia": ${pos.coords.latitude}, ${pos.coords.longitude}
+            }]
+        };
+
+        fetch('https://sheetdb.io/api/v1/fV-neQdPCZCPaNbe45TFv8lg7pvmi1GeGcMTn5pyERk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(result => {
+            document.getElementById('mensaje').style.color = "green";
+            document.getElementById('mensaje').innerText = "¡Registro guardado en Mendoza!";
+            setTimeout(() => location.reload(), 3000);
+        })
+        .catch(error => {
+            alert("Error al conectar con la hoja de cálculo.");
+            console.error(error);
+        });
+
+    }, (error) => {
+        alert("Debe activar el GPS para registrar su ubicación en planta.");
+    });
+}
 async function registrarAutomatico(dniU) {
     const url = 'https://sheetdb.io/api/v1/fV-neQdPCZCPaNbe45TFv8lg7pvmi1GeGcMTn5pyERk';
     const hoy = new Date().toLocaleDateString('es-AR');
