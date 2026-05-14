@@ -9,6 +9,7 @@
 </head>
 <body>
     <div class="container">
+        <!-- Nombre de archivo verificado en imagen b210aab7-e2eb-4ff4-93e0-2be5b2bd2e2f -->
         <img src="LOGO COFAR.jpeg" alt="LOGO COFAR" class="logo">
         <h1 class="titulo-verde">COFARMEN</h1>
         <p class="subtitulo">SISTEMA DE ASISTENCIA</p>
@@ -16,7 +17,7 @@
         <div id="formulario">
             <div class="input-group">
                 <label>DNI</label>
-                <input type="number" id="dni" placeholder="1234">
+                <input type="number" id="dni" placeholder="Ingrese DNI">
             </div>
             <div class="input-group">
                 <label>PIN</label>
@@ -25,14 +26,14 @@
             
             <button onclick="procesarAsistencia()" class="btn-registro">REGISTRAR ASISTENCIA</button>
             
-            <div id="aviso-pausa" class="banner-rojo">
+            <div class="banner-rojo">
                 EL REGISTRO DE PAUSA REQUIERE ESCANEO EN GUARDIA
             </div>
         </div>
 
-        <div id="reader" style="display: none;"></div>
+        <div id="reader" style="display: none; width: 100%;"></div>
         <p id="mensaje"></p>
     </div>
-    <script src="script.js?v=11.0"></script>
+    <script src="script.js?v=final_prod"></script>
 </body>
 </html>
