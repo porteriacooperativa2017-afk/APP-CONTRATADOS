@@ -2,9 +2,9 @@ let qrValidado = false;
 let html5QrCode;
 
 function iniciarEscaneo() {
-    const dniInput = document.getElementById('dni');
-    if (!dniInput.value) {
-        alert("Por favor, ingrese su DNI primero.");
+    const dniVal = document.getElementById('dni').value;
+    if (!dniVal) {
+        alert("Por favor, ingrese su DNI.");
         return;
     }
 
@@ -16,20 +16,19 @@ function iniciarEscaneo() {
     html5QrCode.start(
         { facingMode: "environment" }, 
         { fps: 10, qrbox: 250 },
-        (qrCodeMessage) => {
-            if(qrCodeMessage === "GUARDIA-COFARMEN") {
+        (mensaje) => {
+            if(mensaje === "GUARDIA-COFARMEN") {
                 qrValidado = true;
                 document.getElementById('acciones').style.display = 'block';
                 document.getElementById('seccion-dni').style.display = 'none';
-                readerDiv.style.display = 'none';
-                document.getElementById('mensaje').innerText = "QR Validado.";
+                document.getElementById('reader').style.display = 'none';
+                document.getElementById('mensaje').innerText = "QR OK. Elija movimiento.";
                 html5QrCode.stop();
             }
         },
-        () => { /* Escaneando... */ }
+        (error) => { /* buscando qr... */ }
     ).catch((err) => {
-        console.error(err);
-        alert("Active la cámara o use una conexión segura (HTTPS).");
+        alert("Error de cámara: Verifique permisos de navegador.");
     });
 }
 
@@ -57,15 +56,13 @@ function registrarMovimiento() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         })
-        .then((res) => res.json())
+        .then(res => res.json())
         .then(() => {
-            alert("¡Registro guardado con éxito!");
+            alert("¡Registro guardado!");
             location.reload();
         })
-        .catch(() => {
-            alert("Error al conectar con la planilla.");
-        });
+        .catch(() => alert("Error de red."));
     }, () => {
-        alert("El GPS es obligatorio para registrarse.");
+        alert("Active el GPS para registrarse.");
     });
 }
