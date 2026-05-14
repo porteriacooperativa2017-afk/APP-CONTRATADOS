@@ -3,35 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cofarmen - Control Logística</title>
+    <title>Cofarmen - Registro de Personal</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Librería QR -->
+    <!-- Librería de QR que ya te funcionaba -->
     <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
-    <div class="card">
-        <img src="LOGO COFAR.jpeg" alt="Logo Cofarmen" class="logo">
-        <h2>Registro Logística</h2>
+    <div class="container">
+        <img src="logo-cofarmen.png" alt="Logo Cofarmen" class="logo">
+        <h2>Control de Asistencia</h2>
         
         <div id="seccion-dni">
-            <input type="number" id="dni" placeholder="Ingrese su DNI" required>
-            <button class="btn-qr" id="btn-validar" onclick="iniciarEscaneo()">Validar QR Guardia</button>
+            <div class="input-group">
+                <label for="dni">DNI del Personal</label>
+                <input type="number" id="dni" placeholder="Ingrese DNI sin puntos" required>
+            </div>
+            <button onclick="iniciarEscaneo()" class="btn-principal">Validar con QR Guardia</button>
         </div>
 
-        <div id="reader" style="display:none; width: 100%; margin: 10px 0;"></div>
-        
-        <div id="acciones" style="display:none;">
-            <select id="tipo-evento">
-                <option value="INGRESO">INGRESO</option>
-                <option value="INICIO PAUSA">INICIO PAUSA</option>
-                <option value="REGRESO PAUSA">REGRESO PAUSA</option>
-                <option value="EGRESO">EGRESO</option>
-            </select>
-            <button class="btn-principal" onclick="registrarMovimiento()">REGISTRAR EN HOJA</button>
-        </div>
-        
+        <div id="reader" style="display: none; width: 100%;"></div>
         <p id="mensaje"></p>
     </div>
-    <script src="script.js"></script>
+
+    <!-- Forzamos la carga del script nuevo -->
+    <script src="script.js?v=final_rev_05"></script>
 </body>
 </html>
