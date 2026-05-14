@@ -33,7 +33,7 @@ function iniciarEscaneo() {
 }
 
 async function registrarAutomatico(dniU) {
-    const url = 'https://sheetdb.io/api/v1/fV-neQdPCZCPaNbe45TFv8lg7pvmi1GeGcMTn5pyERk';
+    const url = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
     const hoy = new Date().toLocaleDateString('es-AR');
     
     try {
