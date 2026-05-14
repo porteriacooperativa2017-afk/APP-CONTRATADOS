@@ -3,29 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cofarmen - Registro de Personal</title>
+    <title>Cofarmen - Sistema de Asistencia</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Librería de QR que ya te funcionaba -->
     <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
     <div class="container">
-        <img src="LOGO COFAR.jpeg" alt="LOGO COFAR.jpeg" class="logo">
-        <h2>Control de Asistencia</h2>
+        <img src="LOGO COFARMEN" alt="Cofarmen" class="logo">
+        <h1 class="titulo-verde">COFARMEN</h1>
+        <p class="subtitulo">SISTEMA DE ASISTENCIA</p>
         
-        <div id="seccion-dni">
+        <div id="formulario">
             <div class="input-group">
-                <label for="dni">DNI del Personal</label>
-                <input type="number" id="dni" placeholder="Ingrese DNI sin puntos" required>
+                <label>DNI</label>
+                <input type="number" id="dni" placeholder="1234">
             </div>
-            <button onclick="iniciarEscaneo()" class="btn-principal">Validar con QR Guardia</button>
+            <div class="input-group">
+                <label>PIN</label>
+                <input type="password" id="pin" placeholder="••••">
+            </div>
+            
+            <button onclick="procesarAsistencia()" class="btn-registro">REGISTRAR ASISTENCIA</button>
+            
+            <div id="aviso-pausa" class="banner-rojo">
+                EL REGISTRO DE PAUSA REQUIERE ESCANEO EN GUARDIA
+            </div>
         </div>
 
-        <div id="reader" style="display: none; width: 100%;"></div>
+        <div id="reader" style="display: none;"></div>
         <p id="mensaje"></p>
     </div>
-
-    <!-- Forzamos la carga del script nuevo -->
-    <script src="script.js?v=final_rev_05"></script>
+    <script src="script.js?v=11.0"></script>
 </body>
 </html>
