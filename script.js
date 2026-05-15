@@ -19,69 +19,69 @@ async function procesarAsistencia() {
 
     if (!dniInput || !pinInput) { alert("Complete DNI y PIN"); return; }
 
-    actualizarEstado("⌛ Conectando...", "blue");
+    actualizarEstado("⌛ Validando...", "blue");
 
     try {
         var hoy = obtenerFechaAR();
         
-        // --- 1. CARGAR PERSONAL ---
+        // 1. LOGIN
         var resPers = await fetch(urlBase + "?sheet=Personal");
-        if (!resPers.ok) throw new Error("Servidor Personal: " + resPers.status);
         var listaPersonal = await resPers.json();
-
         var usuario = listaPersonal.find(u => {
-            var valores = Object.values(u); 
-            return String(valores[0]).trim() === dniInput && String(valores[2]).trim() === pinInput;
+            var v = Object.values(u); 
+            return String(v[0]).trim() === dniInput && String(v[2]).trim() === pinInput;
         });
 
-        if (!usuario) {
-            alert("DNI o PIN incorrectos.");
-            actualizarEstado("Registrar Asistencia");
-            return;
-        }
-
+        if (!usuario) { alert("DNI o PIN incorrectos."); actualizarEstado("Registrar Asistencia"); return; }
+        
         var miNombreReal = String(usuario[Object.keys(usuario)[1]]).trim(); 
         actualizarEstado("✅ Hola " + miNombreReal, "green");
 
-        // --- 2. BUSCAR MOVIMIENTOS ---
-        var urlBusqueda = urlBase + "/search?DNI=" + dniInput + "&sheet=Hoja 1";
-        var resMov = await fetch(urlBusqueda);
-        if (!resMov.ok) throw new Error("Servidor Movimientos: " + resMov.status);
+        // 2. BUSCAR MOVIMIENTOS
+        var resMov = await fetch(urlBase + "/search?DNI=" + dniInput + "&sheet=Hoja 1");
         var movimientos = await resMov.json();
         
-        // Buscamos el último registro de hoy
+        // Buscamos el registro de HOY
         var registroHoy = movimientos.slice().reverse().find(f => f.Fecha === hoy);
-        var etapa = 0; 
+        
+        var etapa = 0; // Por defecto: Ingreso
 
         if (registroHoy) {
-            if (registroHoy["Egreso"]) {
-                alert("Jornada finalizada.");
+            // LÓGICA DE PRIORIDAD INVERSA (Crucial para que avance)
+            if (registroHoy["Egreso"] && registroHoy["Egreso"] !== "") {
+                alert("Jornada finalizada por hoy.");
                 actualizarEstado("Registrar Asistencia");
                 return;
-            } else if (registroHoy["Fin Pausa"]) {
-                etapa = 3; 
-            } else if (registroHoy["Inicio Pausa"]) {
-                etapa = 2; 
-            } else if (registroHoy["Ingreso"]) {
-                etapa = 1; 
+            } 
+            else if (registroHoy["Fin Pausa"] && registroHoy["Fin Pausa"] !== "") {
+                etapa = 3; // Sigue: Egreso
+            } 
+            else if (registroHoy["Inicio Pausa"] && registroHoy["Inicio Pausa"] !== "") {
+                etapa = 2; // Sigue: Fin Pausa
+            } 
+            else if (registroHoy["Ingreso"] && registroHoy["Ingreso"] !== "") {
+                etapa = 1; // Sigue: Inicio Pausa
             }
         }
 
+        // 3. DECIDIR ACCIÓN
         if (etapa === 0 || etapa === 3) {
+            // Ingreso y Egreso son directos
             gestionarEnvio(dniInput, etapa, miNombreReal);
         } else {
-            alert("Validación de Guardia necesaria.");
+            // Pausas requieren QR de Guardia
+            alert("Paso: " + (etapa === 1 ? "Inicio Pausa" : "Fin Pausa") + ". Escanee QR.");
             iniciarEscaneo(dniInput, etapa, miNombreReal);
         }
 
     } catch (e) {
-        // ESTO TE VA A DECIR EL ERROR REAL
-        alert("DETALLE DEL ERROR: " + e.message);
-        actualizarEstado("Reintentar");
+        alert("Error de conexión. Reintente.");
+        actualizarEstado("Registrar Asistencia");
     }
 }
 
-// --- ESCANEO Y ENVÍO (IGUAL QUE ANTES PERO MÁS ROBUSTO) ---
+// --- ESCANEO Y ENVÍO (Lógica optimizada) ---
+
 function iniciarEscaneo(dniU, etapa, nombreU) {
     var zona = document.getElementById('reader');
     zona.style.display = 'block';
@@ -94,7 +94,7 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
                 gestionarEnvio(dniU, etapa, nombreU);
             }
         }
-    ).catch(() => alert("Error al encender cámara"));
+    ).catch(() => alert("Error cámara"));
 }
 
 function gestionarEnvio(dniU, etapa, nombreU) {
@@ -117,6 +117,7 @@ function gestionarEnvio(dniU, etapa, nombreU) {
             bodyData.data = [{"Fecha": fechaHoy, "Nombre": nombreU, "DNI": dniU, "Ingreso": horaActual, "Distancia": gps}];
         } else {
             metodo = 'PATCH';
+            // IMPORTANTE: El PATCH busca la fila por DNI y Fecha para no duplicar
             urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
             bodyData.data[columnaDestino] = horaActual;
             bodyData.data["Distancia"] = gps;
@@ -129,13 +130,11 @@ function gestionarEnvio(dniU, etapa, nombreU) {
                 body: JSON.stringify(bodyData)
             });
             if (response.ok) {
-                alert("Registrado: " + columnaDestino);
+                alert("¡Éxito! " + columnaDestino + " registrado.");
                 location.reload();
-            } else {
-                alert("Error servidor: " + response.status);
             }
         } catch (err) {
-            alert("Sin conexión al servidor.");
+            alert("Error al guardar.");
         }
     }, () => alert("Active el GPS"), { enableHighAccuracy: true });
 }
