@@ -1,5 +1,5 @@
 var html5QrCode = null;
-var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
+var urlBase = 'https://sheetdb.io/api/v1/7hbqbid7qazzj';
 
 function obtenerFechaAR() {
     var d = new Date();
@@ -97,27 +97,23 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
     ).catch(() => alert("Error cámara"));
 }
 
-async function gestionarEnvio(dniU, etapa, nombreU) {
+function gestionarEnvio(dniU, etapa, nombreU) {
     var movs = ["Ingreso", "Inicio Pausa", "Fin Pausa", "Egreso"];
     var columnaDestino = movs[etapa];
 
-    // 1. OBTENER CONFIGURACIÓN DESDE EL EXCEL (Hoja 'config')
-    actualizarEstado("📍 Validando ubicación...", "orange");
-    var resConf = await fetch(urlBase + "?sheet=config");
-    var config = await resConf.json();
-    
-    // Según tu foto: B2 es fila 1, B3 fila 2, B4 fila 3 (si no hay encabezados)
-    // Pero si SheetDB detecta encabezados en la fila 1:
-    var latPlanta = parseFloat(config[0].Valor); // Celda B2
-    var lonPlanta = parseFloat(config[1].Valor); // Celda B3
-    var radioMax  = parseFloat(config[2].Valor); // Celda B4 (Tu "1" o "200")
+    actualizarEstado("📍 Validando...", "orange");
+
+    // COORDENADAS FIJAS (Sin llamadas a la API extra)
+    var latPlanta = -32.940227; 
+    var lonPlanta = -68.761023; 
+    var radioMaximo = 200; 
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
         var latUser = pos.coords.latitude;
         var lonUser = pos.coords.longitude;
-        
-        // 2. CALCULAR DISTANCIA (Fórmula Haversine)
-        var R = 6371000; // Radio de la Tierra en metros
+
+        // CÁLCULO DE DISTANCIA
+        var R = 6371000; 
         var dLat = (latPlanta - latUser) * Math.PI / 180;
         var dLon = (lonPlanta - lonUser) * Math.PI / 180;
         var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -126,33 +122,23 @@ async function gestionarEnvio(dniU, etapa, nombreU) {
         var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         var distanciaReal = R * c;
 
-        // 3. LA CONDICIÓN DE ORO (Aquí es donde el '1' o '200' del Excel manda)
-        if (distanciaReal > radioMax) {
-            alert("❌ FUERA DE RANGO. Estás a " + Math.round(distanciaReal) + " metros de la planta.");
+        // BLOQUEO DE SEGURIDAD
+        if (distanciaReal > radioMaximo) {
+            alert("❌ FUERA DE RANGO: Estás a " + Math.round(distanciaReal) + "m.");
             actualizarEstado("Registrar Asistencia");
-            return; // CORTA EL ENVÍO, NO GUARDA NADA
+            return; 
         }
 
-        // --- SI PASA LA VALIDACIÓN, SIGUE EL ENVÍO NORMAL ---
+        // PREPARAR ENVÍO
         var ahora = new Date();
         var fechaHoy = obtenerFechaAR();
         var horaActual = ahora.getHours().toString().padStart(2, '0') + ":" + ahora.getMinutes().toString().padStart(2, '0');
         var gps = latUser.toFixed(5) + "," + lonUser.toFixed(5);
 
-        var urlFinal = "";
-        var metodo = "";
-        var bodyData = { "data": {} };
-
-        if (etapa === 0) {
-            metodo = 'POST';
-            urlFinal = urlBase + "?sheet=Hoja 1";
-            bodyData.data = [{"Fecha": fechaHoy, "Nombre": nombreU, "DNI": dniU, "Ingreso": horaActual, "Distancia": gps}];
-        } else {
-            metodo = 'PATCH';
-            urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
-            bodyData.data[columnaDestino] = horaActual;
-            bodyData.data["Distancia"] = gps;
-        }
+        var urlFinal = (etapa === 0) ? urlBase + "?sheet=Hoja 1" : urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
+        var metodo = (etapa === 0) ? 'POST' : 'PATCH';
+        var bodyData = { "data": (etapa === 0) ? [{"Fecha": fechaHoy, "Nombre": nombreU, "DNI": dniU, "Ingreso": horaActual, "Distancia": gps}] : {} };
+        if (etapa !== 0) bodyData.data[columnaDestino] = horaActual;
 
         try {
             var response = await fetch(urlFinal, {
@@ -160,12 +146,15 @@ async function gestionarEnvio(dniU, etapa, nombreU) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(bodyData)
             });
+
             if (response.ok) {
-                alert("¡Éxito! Distancia: " + Math.round(distanciaReal) + "m. " + columnaDestino + " registrado.");
+                alert("✅ ¡Éxito! Registrado.");
                 location.reload();
+            } else if (response.status === 429) {
+                alert("⚠️ Error: Límite de API de SheetDB alcanzado.");
             }
         } catch (err) {
-            alert("Error al guardar.");
+            alert("❌ Error de red o conexión.");
         }
     }, () => alert("Active el GPS"), { enableHighAccuracy: true });
 }
