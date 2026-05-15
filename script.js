@@ -1,69 +1,90 @@
 // --- VARIABLES GLOBALES ---
-var html5QrCode = null; // Guarda la instancia de la cámara
-var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm'; // Tu API principal
-var nombreHoja = 'Hoja%201'; // "Hoja 1" con espacio codificado
+var html5QrCode = null;
+var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
+var nombreHoja = 'Hoja%201'; // Cambiar a 'Hoja1' si no tiene espacio en tu Excel
+
+/**
+ * FUNCIÓN PARA MOSTRAR MENSAJES EN PANTALLA
+ * Esta ayuda a que sepas qué está pasando sin usar tantos "alert" molestos.
+ */
+function actualizarEstado(mensaje, color = "black") {
+    var statusDiv = document.getElementById('status-message');
+    if (!statusDiv) {
+        // Si no existe el elemento en tu HTML, lo crea dinámicamente
+        statusDiv = document.createElement('div');
+        statusDiv.id = 'status-message';
+        statusDiv.style.fontWeight = 'bold';
+        statusDiv.style.margin = '10px 0';
+        document.body.insertBefore(statusDiv, document.getElementById('reader'));
+    }
+    statusDiv.innerText = mensaje;
+    statusDiv.style.color = color;
+}
 
 /**
  * 1. FUNCIÓN PRINCIPAL: procesarAsistencia
- * Se ejecuta cuando tocás el botón de "Registrar" después de poner DNI/PIN.
  */
 async function procesarAsistencia() {
     var dniVal = document.getElementById('dni').value;
     var pinVal = document.getElementById('pin').value;
 
     if (!dniVal || !pinVal) {
-        alert("Falta DNI o PIN");
+        alert("Complete DNI y PIN");
         return;
     }
+
+    // --- EFECTO VISUAL: PROCESANDO ---
+    actualizarEstado("🔍 Verificando estado en la planilla...", "blue");
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
         
-        // Consultamos a la API qué registros existen para este DNI
+        // Consultamos la API
         var res = await fetch(urlBase + "/search?DNI=" + dniVal + "&sheet=" + nombreHoja);
         var datos = await res.json();
         
-        // Buscamos si existe la fila específica de hoy
         var registroHoy = datos.find(fila => fila.Fecha === hoy);
-        
-        // Obtenemos el nombre del primer registro que encuentre (para no tenerlo fijo en el código)
-        var nombreUsuario = (datos.length > 0) ? datos[0].Nombre : "USUARIO NUEVO";
+        var nombreUsuario = (datos.length > 0) ? datos[0].Nombre : "USUARIO";
 
-        var etapa = 0; // 0=Ingreso, 1=Inicio Pausa, 2=Fin Pausa, 3=Egreso
+        var etapa = 0; 
 
-        // Lógica para decidir qué movimiento toca según qué celdas estén vacías
         if (registroHoy) {
             if (registroHoy["Egreso"]) {
-                alert("Jornada terminada."); return;
+                actualizarEstado("✅ Jornada de hoy finalizada.", "green");
+                return;
             } else if (registroHoy["Fin Pausa"]) {
-                etapa = 3; // Toca Egreso
+                etapa = 3;
+                actualizarEstado("🕒 Estado: Pendiente de Egreso", "orange");
             } else if (registroHoy["Inicio Pausa"]) {
-                etapa = 2; // Toca Fin Pausa
+                etapa = 2;
+                actualizarEstado("🕒 Estado: En Pausa (Esperando Retorno)", "orange");
             } else if (registroHoy["Ingreso"]) {
-                etapa = 1; // Toca Inicio Pausa
+                etapa = 1;
+                actualizarEstado("🕒 Estado: Trabajando (Esperando Pausa)", "orange");
             }
+        } else {
+            actualizarEstado("🕒 Estado: Nuevo Registro de Ingreso", "orange");
         }
 
-        // Si es Ingreso (0) o Egreso (3) no pedimos QR (según tu lógica previa)
-        // Si es Pausa (1 o 2) saltamos a la función de Escaneo
+        // Lógica de acción
         if (etapa === 0 || etapa === 3) {
             gestionarEnvio(dniVal, etapa, nombreUsuario);
         } else {
-            alert("VALIDACIÓN REQUERIDA EN GUARDIA");
+            // Si es pausa, esperamos a que el usuario lea el QR
+            actualizarEstado("📸 Esperando escaneo de QR Guardia...", "purple");
             iniciarEscaneo(dniVal, etapa, nombreUsuario);
         }
     } catch (e) {
-        alert("Error al sincronizar con la planilla.");
+        actualizarEstado("❌ Error de conexión", "red");
     }
 }
 
 /**
- * 2. FUNCIÓN DE ESCANEO: iniciarEscaneo
- * Activa la cámara y espera leer un QR que contenga la palabra "GUARDIA".
+ * 2. FUNCIÓN DE ESCANEO
  */
 function iniciarEscaneo(dniU, etapa, nombreU) {
     var zona = document.getElementById('reader');
-    zona.style.display = 'block'; // Muestra el cuadro de la cámara
+    zona.style.display = 'block';
     
     html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start(
@@ -71,24 +92,27 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
         { fps: 10, qrbox: 250 },
         async function(texto) {
             if (texto.toUpperCase().includes("GUARDIA")) {
-                await html5QrCode.stop(); // Apaga la cámara
-                zona.style.display = 'none'; // Esconde el cuadro
-                gestionarEnvio(dniU, etapa, nombreU); // Pasa al envío de datos
+                actualizarEstado("🎯 QR Validado. Obteniendo GPS...", "blue");
+                await html5QrCode.stop();
+                zona.style.display = 'none';
+                gestionarEnvio(dniU, etapa, nombreU);
             }
         }
-    ).catch(err => alert("Error de cámara: " + err));
+    ).catch(err => actualizarEstado("❌ Error de cámara", "red"));
 }
 
 /**
- * 3. FUNCIÓN DE ENVÍO: gestionarEnvio
- * Obtiene el GPS y decide si crear una fila (POST) o actualizarla (PATCH).
+ * 3. FUNCIÓN DE ENVÍO
  */
 function gestionarEnvio(dniU, etapa, nombreU) {
-    // Array para saber qué columna llenar según la etapa
     var columnas = ["Ingreso", "Inicio Pausa", "Fin Pausa", "Egreso"];
     var mov = columnas[etapa];
 
+    actualizarEstado("🛰️ Obteniendo ubicación GPS...", "blue");
+
     navigator.geolocation.getCurrentPosition(async function(pos) {
+        actualizarEstado("⏳ Guardando " + mov + " en Cofarmen...", "blue");
+
         var ahora = new Date();
         var fechaHoy = ahora.toLocaleDateString('es-AR');
         var horaActual = ahora.toLocaleTimeString('es-AR');
@@ -99,7 +123,6 @@ function gestionarEnvio(dniU, etapa, nombreU) {
         var bodyData = { "data": {} };
 
         if (etapa === 0) {
-            // Caso INGRESO: Se usa POST para crear la fila desde cero
             metodo = 'POST';
             urlFinal = urlBase + "?sheet=" + nombreHoja;
             bodyData.data = [{
@@ -110,15 +133,12 @@ function gestionarEnvio(dniU, etapa, nombreU) {
                 "Distancia": gps
             }];
         } else {
-            // Caso PAUSAS/EGRESO: Se usa PATCH para editar la fila de hoy
             metodo = 'PATCH';
-            // Filtramos por DNI y Fecha para no pisar otros días
             urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=" + nombreHoja;
             bodyData.data[mov] = horaActual;
             bodyData.data["Distancia"] = gps;
         }
 
-        // Enviamos la información a SheetDB
         try {
             var response = await fetch(urlFinal, {
                 method: metodo,
@@ -127,11 +147,11 @@ function gestionarEnvio(dniU, etapa, nombreU) {
             });
 
             if (response.ok) {
-                alert("REGISTRO DE " + mov.toUpperCase() + " EXITOSO");
-                location.reload(); // Recarga la página para limpiar todo
+                actualizarEstado("🎉 " + mov + " registrado con éxito.", "green");
+                setTimeout(() => location.reload(), 2000); // Recarga tras 2 segundos para que veas el mensaje
             }
         } catch (err) {
-            alert("Error de red al intentar guardar.");
+            actualizarEstado("❌ Error al guardar", "red");
         }
-    }, () => alert("El GPS es obligatorio"));
+    }, () => actualizarEstado("❌ Error: Active el GPS", "red"));
 }
