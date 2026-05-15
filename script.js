@@ -1,10 +1,15 @@
-// --- VARIABLES GLOBALES ---
 var html5QrCode = null;
 var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
 
-/**
- * FUNCIÓN DE ESTADO: Actualiza el texto del botón principal.
- */
+// FUNCIÓN PARA TENER SIEMPRE LA MISMA FECHA (DD/MM/YYYY)
+function obtenerFechaAR() {
+    var d = new Date();
+    var dia = String(d.getDate()).padStart(2, '0');
+    var mes = String(d.getMonth() + 1).padStart(2, '0');
+    var anio = d.getFullYear();
+    return dia + "/" + mes + "/" + anio;
+}
+
 function actualizarEstado(mensaje, color = "black") {
     var btn = document.querySelector('button');
     if (btn) {
@@ -13,9 +18,6 @@ function actualizarEstado(mensaje, color = "black") {
     }
 }
 
-/**
- * FUNCIÓN 1: PROCESAR ASISTENCIA (Login y Detección de Etapa)
- */
 async function procesarAsistencia() {
     var dniInput = document.getElementById('dni').value.trim();
     var pinInput = document.getElementById('pin').value.trim();
@@ -28,7 +30,9 @@ async function procesarAsistencia() {
     actualizarEstado("⌛ Validando...", "blue");
 
     try {
-        // --- PASO 1: LOGIN (Con Cache-Busting para APK) ---
+        var hoy = obtenerFechaAR();
+        
+        // 1. LOGIN
         var resPers = await fetch(urlBase + "?sheet=Personal&v=" + new Date().getTime());
         var listaPersonal = await resPers.json();
 
@@ -38,60 +42,52 @@ async function procesarAsistencia() {
         });
 
         if (!usuario) {
-            alert("Acceso denegado: Credenciales incorrectas.");
+            alert("DNI o PIN incorrectos.");
             actualizarEstado("Registrar Asistencia");
             return;
         }
 
-        // Obtenemos el nombre real (Columna B de la hoja Personal)
-        var columnas = Object.keys(usuario);
-        var miNombreReal = String(usuario[columnas[1]]).trim(); 
-        
+        var miNombreReal = String(usuario[Object.keys(usuario)[1]]).trim(); 
         actualizarEstado("✅ Hola " + miNombreReal, "green");
 
-        // --- PASO 2: DETECTAR MOVIMIENTO DEL DÍA (Con Cache-Busting) ---
-        var hoy = new Date().toLocaleDateString('es-AR');
+        // 2. BUSCAR MOVIMIENTOS (Búsqueda por DNI)
         var urlBusqueda = urlBase + "/search?DNI=" + dniInput + "&sheet=Hoja 1&v=" + new Date().getTime();
-        
         var resMov = await fetch(urlBusqueda);
         var movimientos = await resMov.json();
         
-        var registroHoy = movimientos.find(f => f.Fecha === hoy);
-        var etapa = 0; // 0=Ingreso, 1=Inicio Pausa, 2=Fin Pausa, 3=Egreso
+        // Buscamos el registro de hoy (con nuestra fecha manual)
+        var registroHoy = movimientos.reverse().find(f => f.Fecha === hoy);
+        var etapa = 0; 
 
         if (registroHoy) {
-            // Lógica inversa para detectar el último movimiento real
+            // Verificamos qué columna está vacía (usamos !valor para detectar "" o null)
             if (registroHoy["Egreso"]) {
-                alert("Jornada finalizada por hoy.");
+                alert("Jornada ya finalizada.");
                 actualizarEstado("Registrar Asistencia");
                 return;
             } else if (registroHoy["Fin Pausa"]) {
-                etapa = 3; // Sigue: Egreso
+                etapa = 3; // El siguiente paso es Egreso
             } else if (registroHoy["Inicio Pausa"]) {
-                etapa = 2; // Sigue: Fin Pausa
+                etapa = 2; // El siguiente paso es Fin Pausa
             } else if (registroHoy["Ingreso"]) {
-                etapa = 1; // Sigue: Inicio Pausa
+                etapa = 1; // El siguiente paso es Inicio Pausa
             }
         }
 
-        // --- PASO 3: DECIDIR ACCIÓN ---
-        // Ingreso (0) y Egreso (3) son directos. Pausas (1 y 2) requieren QR de Guardia.
+        // 3. ACCIÓN
         if (etapa === 0 || etapa === 3) {
             gestionarEnvio(dniInput, etapa, miNombreReal);
         } else {
-            alert("Validación de Guardia necesaria para la Pausa.");
+            alert("Escanee el QR de Guardia para continuar.");
             iniciarEscaneo(dniInput, etapa, miNombreReal);
         }
 
     } catch (e) {
-        alert("Error de conexión. Verifique su internet.");
+        alert("Error de conexión.");
         actualizarEstado("Registrar Asistencia");
     }
 }
 
-/**
- * FUNCIÓN 2: ESCANEO DE QR (Cámara)
- */
 function iniciarEscaneo(dniU, etapa, nombreU) {
     var zona = document.getElementById('reader');
     zona.style.display = 'block';
@@ -100,7 +96,6 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
         { facingMode: "environment" }, 
         { fps: 10, qrbox: 250 },
         async function(texto) {
-            // El QR debe contener la palabra "GUARDIA"
             if (texto.toUpperCase().includes("GUARDIA")) {
                 await html5QrCode.stop();
                 zona.style.display = 'none';
@@ -108,26 +103,21 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
             }
         }
     ).catch(err => {
-        alert("Error al abrir la cámara.");
+        alert("Error cámara");
         actualizarEstado("Registrar Asistencia");
     });
 }
 
-/**
- * FUNCIÓN 3: ENVÍO DEFINITIVO A GOOGLE SHEETS
- */
 function gestionarEnvio(dniU, etapa, nombreU) {
     var movs = ["Ingreso", "Inicio Pausa", "Fin Pausa", "Egreso"];
     var columnaDestino = movs[etapa];
 
-    actualizarEstado("🛰️ Obteniendo GPS...", "blue");
+    actualizarEstado("🛰️ GPS...", "blue");
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
-        actualizarEstado("⏳ Guardando...", "blue");
-
         var ahora = new Date();
-        var fechaHoy = ahora.toLocaleDateString('es-AR');
-        var horaActual = ahora.toLocaleTimeString('es-AR');
+        var fechaHoy = obtenerFechaAR();
+        var horaActual = ahora.getHours().toString().padStart(2, '0') + ":" + ahora.getMinutes().toString().padStart(2, '0');
         var gps = pos.coords.latitude.toFixed(5) + "," + pos.coords.longitude.toFixed(5);
 
         var urlFinal = "";
@@ -135,7 +125,6 @@ function gestionarEnvio(dniU, etapa, nombreU) {
         var bodyData = { "data": {} };
 
         if (etapa === 0) {
-            // Nuevo registro (POST)
             metodo = 'POST';
             urlFinal = urlBase + "?sheet=Hoja 1";
             bodyData.data = [{
@@ -146,8 +135,8 @@ function gestionarEnvio(dniU, etapa, nombreU) {
                 "Distancia": gps
             }];
         } else {
-            // Actualizar registro existente (PATCH)
             metodo = 'PATCH';
+            // Filtramos por DNI y por la Fecha manual para que no edite filas viejas
             urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
             bodyData.data[columnaDestino] = horaActual;
             bodyData.data["Distancia"] = gps;
@@ -161,17 +150,12 @@ function gestionarEnvio(dniU, etapa, nombreU) {
             });
 
             if (response.ok) {
-                alert("¡Éxito! " + columnaDestino + " registrado correctamente.");
-                location.reload(); // Recarga para limpiar datos
-            } else {
-                throw new Error("Error en respuesta de servidor");
+                alert("Registrado: " + columnaDestino);
+                location.reload();
             }
         } catch (err) {
-            alert("Error al guardar en la planilla. Intente de nuevo.");
+            alert("Error al guardar.");
             actualizarEstado("Registrar Asistencia");
         }
-    }, () => {
-        alert("Debe activar el GPS para registrar su asistencia.");
-        actualizarEstado("Registrar Asistencia");
-    }, { enableHighAccuracy: true });
+    }, () => alert("Active el GPS"), { enableHighAccuracy: true });
 }
