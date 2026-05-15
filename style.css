@@ -1,7 +1,7 @@
-/* --- CONFIGURACIÓN GENERAL --- */
+/* --- CONFIGURACIÓN DE FONDO --- */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f4f7f6;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -11,97 +11,102 @@ body {
 
 .container {
     background: #ffffff;
-    padding: 2rem;
-    border-radius: 15px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    width: 100%;
-    max-width: 400px;
+    padding: 30px;
+    border-radius: 25px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+    width: 90%;
+    max-width: 380px;
     text-align: center;
-    border-top: 5px solid #004b81; /* Color corporativo Cofarmen */
+    margin-top: 50px; /* Espacio para que el logo no choque arriba */
 }
 
-/* --- ANIMACIÓN DEL LOGO --- */
-.logo {
-    width: 180px;
-    margin-bottom: 20px;
-    /* Aplicamos la animación de pulso */
-    animation: pulsoLogo 3s ease-in-out infinite;
-    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+/* --- EFECTO DEL LOGO (EL "LATIDO") --- */
+.logo-container {
+    width: 120px;
+    height: 120px;
+    background: white;
+    border-radius: 50%; /* Lo hace redondo */
+    margin: -80px auto 20px auto; /* Lo posiciona arriba de la tarjeta */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    overflow: hidden;
+    
+    /* ACTIVACIÓN DE LA ANIMACIÓN */
+    animation: latidoEfecto 3s ease-in-out infinite; 
 }
 
-@keyframes pulsoLogo {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+.logo-container img {
+    width: 85%;
+    height: auto;
 }
 
-/* --- ESTILO DE INPUTS Y BOTONES --- */
+/* AQUÍ ESTÁ EL MOVIMIENTO (Keyframes) */
+@keyframes latidoEfecto {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    50% {
+        transform: scale(1.08); /* Se agranda un 8% */
+        box-shadow: 0 12px 25px rgba(0,0,0,0.25);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+}
+
+/* --- CAMPOS Y BOTONES --- */
 h2 {
-    color: #333;
-    font-size: 1.2rem;
-    margin-bottom: 1.5rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    color: #004b81;
+    margin-bottom: 5px;
 }
 
 input {
     width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    box-sizing: border-box; /* Evita que el input se salga del borde */
+    padding: 14px;
+    margin: 8px 0;
+    border: none;
+    background: #f5f5f5;
+    border-radius: 12px;
+    box-sizing: border-box;
     font-size: 16px;
-    transition: border-color 0.3s;
-}
-
-input:focus {
-    outline: none;
-    border-color: #004b81;
-    box-shadow: 0 0 5px rgba(0,75,129,0.2);
 }
 
 button {
     width: 100%;
-    padding: 15px;
-    background-color: #004b81;
+    padding: 16px;
+    background-color: #4db6ac; /* Verde claro */
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 15px;
     font-size: 16px;
     font-weight: bold;
+    text-transform: uppercase;
     cursor: pointer;
     margin-top: 15px;
-    transition: background 0.3s, transform 0.2s;
-}
-
-button:hover {
-    background-color: #00355f;
+    transition: 0.3s;
 }
 
 button:active {
-    transform: scale(0.98);
+    transform: scale(0.95);
 }
 
-button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
+/* --- CUADRO DE ESTADO EN VERDE --- */
+#status-message {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #e0f2f1; /* Verde clarito fondo */
+    color: #00796b; /* Verde oscuro letra */
+    border-radius: 12px;
+    font-weight: bold;
+    border: 1px solid #b2dfdb;
 }
 
-/* --- CUADRO DE CÁMARA (QR) --- */
 #reader {
     width: 100%;
-    border-radius: 12px;
-    overflow: hidden;
-    margin-top: 20px;
-    border: 2px solid #004b81;
-    display: none; /* Se activa por script */
-}
-
-/* --- MENSAJE DE ESTADO --- */
-#status-message {
-    font-size: 0.9rem;
+    border-radius: 15px;
     margin-top: 15px;
-    min-height: 1.2em;
-    font-weight: 600;
 }
