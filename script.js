@@ -35,7 +35,7 @@ var html5QrCode = null;
 // Mantenemos tu API original
 var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
 // Forzamos Hoja 1. OJO: Si tu pestaña se llama "Hoja 1" (con espacio), debe ir Hoja%201
-var nombreHoja = 'Hoja%201'; 
+var nombreHoja = 'Hoja 1'; 
 
 async function procesarAsistencia() {
     var dniVal = document.getElementById('dni').value;
