@@ -97,15 +97,47 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
     ).catch(() => alert("Error cámara"));
 }
 
-function gestionarEnvio(dniU, etapa, nombreU) {
+async function gestionarEnvio(dniU, etapa, nombreU) {
     var movs = ["Ingreso", "Inicio Pausa", "Fin Pausa", "Egreso"];
     var columnaDestino = movs[etapa];
 
+    // 1. OBTENER CONFIGURACIÓN DESDE EL EXCEL (Hoja 'config')
+    actualizarEstado("📍 Validando ubicación...", "orange");
+    var resConf = await fetch(urlBase + "?sheet=config");
+    var config = await resConf.json();
+    
+    // Según tu foto: B2 es fila 1, B3 fila 2, B4 fila 3 (si no hay encabezados)
+    // Pero si SheetDB detecta encabezados en la fila 1:
+    var latPlanta = parseFloat(config[0].Valor); // Celda B2
+    var lonPlanta = parseFloat(config[1].Valor); // Celda B3
+    var radioMax  = parseFloat(config[2].Valor); // Celda B4 (Tu "1" o "200")
+
     navigator.geolocation.getCurrentPosition(async function(pos) {
+        var latUser = pos.coords.latitude;
+        var lonUser = pos.coords.longitude;
+        
+        // 2. CALCULAR DISTANCIA (Fórmula Haversine)
+        var R = 6371000; // Radio de la Tierra en metros
+        var dLat = (latPlanta - latUser) * Math.PI / 180;
+        var dLon = (lonPlanta - lonUser) * Math.PI / 180;
+        var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(latUser * Math.PI / 180) * Math.cos(latPlanta * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        var distanciaReal = R * c;
+
+        // 3. LA CONDICIÓN DE ORO (Aquí es donde el '1' o '200' del Excel manda)
+        if (distanciaReal > radioMax) {
+            alert("❌ FUERA DE RANGO. Estás a " + Math.round(distanciaReal) + " metros de la planta.");
+            actualizarEstado("Registrar Asistencia");
+            return; // CORTA EL ENVÍO, NO GUARDA NADA
+        }
+
+        // --- SI PASA LA VALIDACIÓN, SIGUE EL ENVÍO NORMAL ---
         var ahora = new Date();
         var fechaHoy = obtenerFechaAR();
         var horaActual = ahora.getHours().toString().padStart(2, '0') + ":" + ahora.getMinutes().toString().padStart(2, '0');
-        var gps = pos.coords.latitude.toFixed(5) + "," + pos.coords.longitude.toFixed(5);
+        var gps = latUser.toFixed(5) + "," + lonUser.toFixed(5);
 
         var urlFinal = "";
         var metodo = "";
@@ -117,7 +149,6 @@ function gestionarEnvio(dniU, etapa, nombreU) {
             bodyData.data = [{"Fecha": fechaHoy, "Nombre": nombreU, "DNI": dniU, "Ingreso": horaActual, "Distancia": gps}];
         } else {
             metodo = 'PATCH';
-            // IMPORTANTE: El PATCH busca la fila por DNI y Fecha para no duplicar
             urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
             bodyData.data[columnaDestino] = horaActual;
             bodyData.data["Distancia"] = gps;
@@ -130,7 +161,7 @@ function gestionarEnvio(dniU, etapa, nombreU) {
                 body: JSON.stringify(bodyData)
             });
             if (response.ok) {
-                alert("¡Éxito! " + columnaDestino + " registrado.");
+                alert("¡Éxito! Distancia: " + Math.round(distanciaReal) + "m. " + columnaDestino + " registrado.");
                 location.reload();
             }
         } catch (err) {
