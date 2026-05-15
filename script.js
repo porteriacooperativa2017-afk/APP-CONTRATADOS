@@ -1,49 +1,64 @@
+// --- VARIABLES GLOBALES ---
 var html5QrCode = null;
 var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
-var nombreHoja = 'Hoja%201'; 
+var nombreHojaRegistro = 'Hoja 1'; // Donde se guarda la asistencia
+var nombreHojaPersonal = 'Personal'; // Donde se valida el login
 
-// Función para cambiar el texto del botón y dar feedback
-function botonCargando(estado) {
-    var btn = document.querySelector('button'); // Busca tu botón de registro
-    if (estado) {
-        btn.disabled = true;
-        btn.innerText = "⌛ Procesando...";
-    } else {
-        btn.disabled = false;
-        btn.innerText = "Registrar Asistencia";
+// Función para mostrar que el sistema está trabajando
+function setCargando(estado) {
+    var btn = document.querySelector('button');
+    if (btn) {
+        btn.disabled = estado;
+        btn.innerText = estado ? "⌛ Procesando..." : "Registrar Asistencia";
     }
 }
 
+// --- FUNCIÓN 1: VALIDACIÓN Y LÓGICA DE ASISTENCIA ---
 async function procesarAsistencia() {
-    var dniVal = document.getElementById('dni').value;
-    var pinVal = document.getElementById('pin').value;
+    var dniInput = document.getElementById('dni').value.trim();
+    var pinInput = document.getElementById('pin').value.trim();
 
-    if (!dniVal || !pinVal) {
+    if (!dniInput || !pinInput) {
         alert("Complete DNI y PIN");
         return;
     }
 
-    // Iniciamos feedback
-    botonCargando(true);
+    setCargando(true);
 
     try {
-        var hoy = new Date().toLocaleDateString('es-AR');
-        
-        // Buscamos datos (respetando tu lógica que funcionaba)
-        var res = await fetch(urlBase + "/search?DNI=" + dniVal + "&sheet=" + nombreHoja);
-        var datos = await res.json();
-        
-        var registroHoy = datos.find(f => f.Fecha === hoy);
-        
-        // MEJORA: Nombre dinámico desde la base de datos
-        var nombreUsuario = (datos.length > 0) ? datos[0].Nombre : "Diego Olivares";
+        // 1. VALIDACIÓN EN PESTAÑA PERSONAL
+        // Traemos los datos de la hoja Personal para validar manualmente
+        var resPersona = await fetch(urlBase + "?sheet=" + nombreHojaPersonal);
+        var listaPersonal = await resPersona.json();
 
+        // Buscamos al usuario comparando DNI (Columna A) y Contraseña (Columna C)
+        // Usamos los nombres exactos de tus encabezados en la hoja Personal
+        var usuarioValido = listaPersonal.find(u => 
+            String(u.DNI).trim() === dniInput && 
+            String(u.CONTRASEÑA).trim() === pinInput
+        );
+
+        if (!usuarioValido) {
+            alert("DNI o Contraseña incorrectos. Verifique en la hoja Personal.");
+            setCargando(false);
+            return;
+        }
+
+        // Si es válido, tomamos el nombre completo de la columna B
+        var nombreReal = usuarioValido["NOMBRE COMPLETO"];
+
+        // 2. CHEQUEO DE ESTADO EN HOJA 1
+        var hoy = new Date().toLocaleDateString('es-AR');
+        var resMov = await fetch(urlBase + "/search?DNI=" + dniInput + "&sheet=" + nombreHojaRegistro);
+        var movimientos = await resMov.json();
+        
+        var registroHoy = movimientos.find(f => f.Fecha === hoy);
         var etapa = 0; 
 
         if (registroHoy) {
             if (registroHoy["Egreso"]) {
-                alert("Jornada finalizada");
-                botonCargando(false);
+                alert("Jornada de hoy ya finalizada.");
+                setCargando(false);
                 return;
             } else if (registroHoy["Fin Pausa"]) {
                 etapa = 3;
@@ -54,19 +69,22 @@ async function procesarAsistencia() {
             }
         }
 
+        // 3. ACCIÓN SEGÚN ETAPA
         if (etapa === 0 || etapa === 3) {
-            gestionarEnvio(dniVal, etapa, nombreUsuario);
+            gestionarEnvio(dniInput, etapa, nombreReal);
         } else {
-            // Si es pausa, avisamos antes de abrir cámara
-            alert("Etapa detectada: " + (etapa === 1 ? "Inicio Pausa" : "Fin Pausa") + ". Prepare el QR de Guardia.");
-            iniciarEscaneo(dniVal, etapa, nombreUsuario);
+            alert("Validación requerida: Escanee el QR de Guardia");
+            iniciarEscaneo(dniInput, etapa, nombreReal);
         }
+
     } catch (e) {
-        alert("Error de conexión");
-        botonCargando(false);
+        console.error(e);
+        alert("Error de conexión. Intente nuevamente.");
+        setCargando(false);
     }
 }
 
+// --- FUNCIÓN 2: ESCANEO DE QR (Mantenemos tu lógica) ---
 function iniciarEscaneo(dniU, etapa, nombreU) {
     var zona = document.getElementById('reader');
     zona.style.display = 'block';
@@ -83,11 +101,12 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
             }
         }
     ).catch(err => {
-        alert("Error de cámara");
-        botonCargando(false);
+        alert("Error al iniciar cámara.");
+        setCargando(false);
     });
 }
 
+// --- FUNCIÓN 3: ENVÍO DE DATOS A HOJA 1 ---
 function gestionarEnvio(dniU, etapa, nombreU) {
     var columnas = ["Ingreso", "Inicio Pausa", "Fin Pausa", "Egreso"];
     var mov = columnas[etapa];
@@ -104,7 +123,7 @@ function gestionarEnvio(dniU, etapa, nombreU) {
 
         if (etapa === 0) {
             metodo = 'POST';
-            urlFinal = urlBase + "?sheet=" + nombreHoja;
+            urlFinal = urlBase + "?sheet=" + nombreHojaRegistro;
             bodyData.data = [{
                 "Fecha": fechaHoy,
                 "Nombre": nombreU,
@@ -114,7 +133,7 @@ function gestionarEnvio(dniU, etapa, nombreU) {
             }];
         } else {
             metodo = 'PATCH';
-            urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=" + nombreHoja;
+            urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=" + nombreHojaRegistro;
             bodyData.data[mov] = horaActual;
             bodyData.data["Distancia"] = gps;
         }
@@ -127,15 +146,15 @@ function gestionarEnvio(dniU, etapa, nombreU) {
             });
 
             if (response.ok) {
-                alert("ÉXITO: " + mov + " registrado correctamente.");
+                alert("¡Registro de " + mov + " exitoso!");
                 location.reload();
             }
         } catch (err) {
-            alert("Error al guardar");
-            botonCargando(false);
+            alert("Error al guardar en la planilla.");
+            setCargando(false);
         }
     }, function() {
-        alert("GPS no detectado");
-        botonCargando(false);
+        alert("Error: El GPS es obligatorio.");
+        setCargando(false);
     });
 }
