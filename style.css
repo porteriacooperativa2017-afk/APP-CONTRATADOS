@@ -1,10 +1,107 @@
-body { font-family: Arial, sans-serif; background-color: #eeeeee; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-.container { background-color: #ffffff; padding: 35px; border-radius: 20px; width: 90%; max-width: 420px; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-.logo { width: 100%; max-width: 200px; height: auto; margin-bottom: 15px; }
-.titulo-verde { color: #2e7d32; margin: 0; font-size: 26px; letter-spacing: 1px; }
-.subtitulo { color: #666; margin-top: 5px; font-size: 14px; margin-bottom: 25px; }
-.input-group { text-align: left; margin-bottom: 18px; }
-label { color: #2e7d32; font-weight: bold; display: block; margin-bottom: 5px; }
-input { width: 100%; padding: 12px; border: none; border-bottom: 1px solid #ccc; font-size: 16px; box-sizing: border-box; outline: none; }
-.btn-registro { background-color: #2e7d32; color: white; border: none; padding: 16px; border-radius: 50px; width: 100%; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
-.banner-rojo { background-color: #c62828; color: white; padding: 12px; border-radius: 10px; margin-top: 15px; font-size: 12px; font-weight: bold; }
+/* --- CONFIGURACIÓN GENERAL --- */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f7f6;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.container {
+    background: #ffffff;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    border-top: 5px solid #004b81; /* Color corporativo Cofarmen */
+}
+
+/* --- ANIMACIÓN DEL LOGO --- */
+.logo {
+    width: 180px;
+    margin-bottom: 20px;
+    /* Aplicamos la animación de pulso */
+    animation: pulsoLogo 3s ease-in-out infinite;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+}
+
+@keyframes pulsoLogo {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* --- ESTILO DE INPUTS Y BOTONES --- */
+h2 {
+    color: #333;
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-sizing: border-box; /* Evita que el input se salga del borde */
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+input:focus {
+    outline: none;
+    border-color: #004b81;
+    box-shadow: 0 0 5px rgba(0,75,129,0.2);
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    background-color: #004b81;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: background 0.3s, transform 0.2s;
+}
+
+button:hover {
+    background-color: #00355f;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* --- CUADRO DE CÁMARA (QR) --- */
+#reader {
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 20px;
+    border: 2px solid #004b81;
+    display: none; /* Se activa por script */
+}
+
+/* --- MENSAJE DE ESTADO --- */
+#status-message {
+    font-size: 0.9rem;
+    margin-top: 15px;
+    min-height: 1.2em;
+    font-weight: 600;
+}
