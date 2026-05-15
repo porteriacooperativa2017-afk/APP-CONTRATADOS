@@ -1,73 +1,32 @@
-let html5QrCode;
-
-function iniciarEscaneo() {
-    const dniVal = document.getElementById('dni').value;
-    if (!dniVal) {
-        alert("Por favor, ingrese su DNI.");
-        return;
-    }
-
-    const readerDiv = document.getElementById('reader');
-    readerDiv.style.display = 'block';
-    
-    // Esta es la configuración exacta que ya te funcionaba para abrir la cámara
-    html5QrCode = new Html5Qrcode("reader");
-    
-    html5QrCode.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: 250 },
-        async (qrCodeMessage) => {
-            const limpio = qrCodeMessage.toUpperCase().trim();
-            // Aceptamos tanto el guion bajo como el medio para evitar errores en planta
-            if(limpio.includes("GUARDIA_COFARMEN") || limpio.includes("GUARDIA-COFARMEN")) {
-                await html5QrCode.stop();
-                document.getElementById('reader').style.display = 'none';
-                // Ejecutamos la lógica de registro automático
-                registrarAutomatico(dniVal);
-            }
-        },
-        (errorMessage) => { /* Escaneando... */ }
-    ).catch((err) => {
-        alert("Error de cámara. Asegúrese de dar permisos y usar HTTPS.");
-    });
-}
 var html5QrCode = null;
-// Mantenemos tu API original
 var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
-// Forzamos Hoja 1. OJO: Si tu pestaña se llama "Hoja 1" (con espacio), debe ir Hoja%201
-var nombreHoja = 'Hoja 1'; 
 
 async function procesarAsistencia() {
     var dniVal = document.getElementById('dni').value;
     var pinVal = document.getElementById('pin').value;
 
     if (!dniVal || !pinVal) {
-        alert("Complete DNI y PIN");
+        alert("Falta DNI o PIN");
         return;
     }
 
     try {
         var hoy = new Date().toLocaleDateString('es-AR');
-        // Agregamos el parámetro de la hoja también en la búsqueda
-        var urlBusqueda = urlBase + "/search?DNI=" + dniVal + "&Fecha=" + hoy + "&sheet=" + nombreHoja;
         
-        var respuesta = await fetch(urlBusqueda); 
-        var datos = await respuesta.json();
+        // BUSQUEDA FORZADA: Le decimos explícitamente que mire la Hoja 1
+        var res = await fetch(urlBase + "/search?DNI=" + dniVal + "&Fecha=" + hoy + "&sheet=Hoja 1");
+        var datos = await res.json();
         
-        if (!Array.isArray(datos)) {
-            throw new Error("Respuesta de API inválida");
-        }
-
         var cantidad = datos.length;
 
         if (cantidad === 0 || cantidad === 3) {
             gestionarEnvio(dniVal, cantidad);
         } else {
-            alert("VALIDACIÓN EN GUARDIA REQUERIDA");
+            alert("ESCANEE QR EN GUARDIA");
             iniciarEscaneo(dniVal, cantidad);
         }
-    } catch (error) {
-        alert("ERROR EN BÚSQUEDA: " + error.message);
+    } catch (e) {
+        alert("Error de conexión");
     }
 }
 
