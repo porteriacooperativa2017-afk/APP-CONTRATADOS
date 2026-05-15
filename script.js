@@ -103,7 +103,7 @@ function gestionarEnvio(dniU, cuenta) {
             // PATCH: Actualizar fila existente
             metodo = 'PATCH';
             // Filtramos por DNI y Fecha para asegurar que sea la fila de hoy
-            urlFinal = urlBase + "/DNI/" + dniU + "?sheet=Hoja%201" + "&Fecha=" + hoy;
+            urlFinal = urlBase + "/DNI/" + dniU + "?sheet=Hoja 1" + "&Fecha=" + hoy;
             cuerpo.data[mov] = horaActual;
             cuerpo.data["Distancia"] = coords;
         }
