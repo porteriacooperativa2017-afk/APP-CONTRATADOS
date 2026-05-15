@@ -1,3 +1,36 @@
+let html5QrCode;
+
+function iniciarEscaneo() {
+    const dniVal = document.getElementById('dni').value;
+    if (!dniVal) {
+        alert("Por favor, ingrese su DNI.");
+        return;
+    }
+
+    const readerDiv = document.getElementById('reader');
+    readerDiv.style.display = 'block';
+    
+    // Esta es la configuración exacta que ya te funcionaba para abrir la cámara
+    html5QrCode = new Html5Qrcode("reader");
+    
+    html5QrCode.start(
+        { facingMode: "environment" }, 
+        { fps: 10, qrbox: 250 },
+        async (qrCodeMessage) => {
+            const limpio = qrCodeMessage.toUpperCase().trim();
+            // Aceptamos tanto el guion bajo como el medio para evitar errores en planta
+            if(limpio.includes("GUARDIA_COFARMEN") || limpio.includes("GUARDIA-COFARMEN")) {
+                await html5QrCode.stop();
+                document.getElementById('reader').style.display = 'none';
+                // Ejecutamos la lógica de registro automático
+                registrarAutomatico(dniVal);
+            }
+        },
+        (errorMessage) => { /* Escaneando... */ }
+    ).catch((err) => {
+        alert("Error de cámara. Asegúrese de dar permisos y usar HTTPS.");
+    });
+}
 var html5QrCode = null;
 // Mantenemos tu API original
 var urlBase = 'https://sheetdb.io/api/v1/0r37mye22zrgm';
