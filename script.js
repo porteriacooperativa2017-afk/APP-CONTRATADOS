@@ -1,5 +1,6 @@
 var html5QrCode = null;
-var urlBase = 'https://sheetdb.io/api/v1/7hbqbid7qazzj';
+// Cuando migres a Google Apps Script, cambiás esta URL por la tuya que termina en /exec
+var urlBase = 'https://sheetdb.io/api/v1/7hbqbid7qazzj'; 
 
 function obtenerFechaAR() {
     var d = new Date();
@@ -44,33 +45,42 @@ async function procesarAsistencia() {
         // Buscamos el registro de HOY
         var registroHoy = movimientos.slice().reverse().find(f => f.Fecha === hoy);
         
-        var etapa = 0; // Por defecto: Ingreso
+        var etapa = 0; // Por defecto: Ingreso (Columna D)
 
         if (registroHoy) {
-            // LÓGICA DE PRIORIDAD INVERSA (Crucial para que avance)
+            // LÓGICA DE PRIORIDAD INVERSA EXTENDIDA A 2 PAUSAS
             if (registroHoy["Egreso"] && registroHoy["Egreso"] !== "") {
                 alert("Jornada finalizada por hoy.");
                 actualizarEstado("Registrar Asistencia");
                 return;
             } 
-            else if (registroHoy["Fin Pausa"] && registroHoy["Fin Pausa"] !== "") {
-                etapa = 3; // Sigue: Egreso
+            else if (registroHoy["Fin Pausa 2"] && registroHoy["Fin Pausa 2"] !== "") {
+                etapa = 5; // Sigue: Egreso
+            }
+            else if (registroHoy["Inicio Pausa 2"] && registroHoy["Inicio Pausa 2"] !== "") {
+                etapa = 4; // Sigue: Fin Pausa 2
+            }
+            else if (registroHoy["Fin Pausa 1"] && registroHoy["Fin Pausa 1"] !== "") {
+                // Alerta informativa del límite de tiempo acumulado
+                alert("Ya utilizaste la primera pausa. Recordá que el total disponible es de 30 minutos.");
+                etapa = 3; // Sigue: Inicio Pausa 2
             } 
-            else if (registroHoy["Inicio Pausa"] && registroHoy["Inicio Pausa"] !== "") {
-                etapa = 2; // Sigue: Fin Pausa
+            else if (registroHoy["Inicio Pausa 1"] && registroHoy["Inicio Pausa 1"] !== "") {
+                etapa = 2; // Sigue: Fin Pausa 1
             } 
             else if (registroHoy["Ingreso"] && registroHoy["Ingreso"] !== "") {
-                etapa = 1; // Sigue: Inicio Pausa
+                etapa = 1; // Sigue: Inicio Pausa 1
             }
         }
 
         // 3. DECIDIR ACCIÓN
-        if (etapa === 0 || etapa === 3) {
-            // Ingreso y Egreso son directos
+        // Las etapas de Pausas (1, 2, 3, 4) requieren el QR del Guardia. 
+        // Ingreso (0) y Egreso (5) son directos sin QR de portería.
+        if (etapa === 0 || etapa === 5) {
             gestionarEnvio(dniInput, etapa, miNombreReal);
         } else {
-            // Pausas requieren QR de Guardia
-            alert("Paso: " + (etapa === 1 ? "Inicio Pausa" : "Fin Pausa") + ". Escanee QR.");
+            var nombresEtapas = ["", "Inicio Pausa 1", "Fin Pausa 1", "Inicio Pausa 2", "Fin Pausa 2"];
+            alert("Paso: " + nombresEtapas[etapa] + ". Escanee el QR de Portería.");
             iniciarEscaneo(dniInput, etapa, miNombreReal);
         }
 
@@ -80,7 +90,7 @@ async function procesarAsistencia() {
     }
 }
 
-// --- ESCANEO Y ENVÍO (Lógica optimizada) ---
+// --- ESCANEO Y ENVÍO ---
 
 function iniciarEscaneo(dniU, etapa, nombreU) {
     var zona = document.getElementById('reader');
@@ -98,12 +108,13 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
 }
 
 function gestionarEnvio(dniU, etapa, nombreU) {
-    var movs = ["Ingreso", "Inicio Pausa", "Fin Pausa", "Egreso"];
+    // Mapeo exacto con los nombres de tus columnas en la "Hoja 1"
+    var movs = ["Ingreso", "Inicio Pausa 1", "Fin Pausa 1", "Inicio Pausa 2", "Fin Pausa 2", "Egreso"];
     var columnaDestino = movs[etapa];
 
     actualizarEstado("📍 Validando...", "orange");
 
-    // COORDENADAS FIJAS (Sin llamadas a la API extra)
+    // COORDENADAS FIJAS (Planta)
     var latPlanta = -32.940227; 
     var lonPlanta = -68.761023; 
     var radioMaximo = 200; 
@@ -118,25 +129,25 @@ function gestionarEnvio(dniU, etapa, nombreU) {
         var dLon = (lonPlanta - lonUser) * Math.PI / 180;
         var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                 Math.cos(latUser * Math.PI / 180) * Math.cos(latPlanta * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
+                Math.sin(dLon/2) * dLon/2;
         var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         var distanciaReal = R * c;
 
-        // BLOQUEO DE SEGURIDAD
         if (distanciaReal > radioMaximo) {
             alert("❌ FUERA DE RANGO: Estás a " + Math.round(distanciaReal) + "m.");
             actualizarEstado("Registrar Asistencia");
             return; 
         }
 
-        // PREPARAR ENVÍO
         var ahora = new Date();
         var fechaHoy = obtenerFechaAR();
         var horaActual = ahora.getHours().toString().padStart(2, '0') + ":" + ahora.getMinutes().toString().padStart(2, '0');
         var gps = latUser.toFixed(5) + "," + lonUser.toFixed(5);
 
+        // Si es etapa 0 (Ingreso) hace POST, sino hace PATCH apuntando a la fila del DNI y Fecha de hoy
         var urlFinal = (etapa === 0) ? urlBase + "?sheet=Hoja 1" : urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
         var metodo = (etapa === 0) ? 'POST' : 'PATCH';
+        
         var bodyData = { "data": (etapa === 0) ? [{"Fecha": fechaHoy, "Nombre": nombreU, "DNI": dniU, "Ingreso": horaActual, "Distancia": gps}] : {} };
         if (etapa !== 0) bodyData.data[columnaDestino] = horaActual;
 
@@ -148,7 +159,7 @@ function gestionarEnvio(dniU, etapa, nombreU) {
             });
 
             if (response.ok) {
-                alert("✅ ¡Éxito! Registrado.");
+                alert("✅ ¡Éxito! " + columnaDestino + " registrado correctamente.");
                 location.reload();
             } else if (response.status === 429) {
                 alert("⚠️ Error: Límite de API de SheetDB alcanzado.");
