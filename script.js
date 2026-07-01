@@ -107,17 +107,45 @@ function iniciarEscaneo(dniU, etapa, nombreU) {
     ).catch(() => alert("Error cámara"));
 }
 
-function gestionarEnvio(dniU, etapa, nombreU) {
+async function gestionarEnvio(dniU, etapa, nombreU) {
     // Mapeo exacto con los nombres de tus columnas en la "Hoja 1"
     var movs = ["Ingreso", "Inicio Pausa 1", "Fin Pausa 1", "Inicio Pausa 2", "Fin Pausa 2", "Egreso"];
     var columnaDestino = movs[etapa];
 
     actualizarEstado("📍 Validando...", "orange");
 
+    if (etapa !== 0 && etapa !== 5) {
+        var ahora = new Date();
+        var fechaHoy = obtenerFechaAR();
+        var horaActual = ahora.getHours().toString().padStart(2, "0") + ":" + ahora.getMinutes().toString().padStart(2, "0");
+        var urlFinal = urlBase + "/DNI/" + dniU + "?Fecha=" + fechaHoy + "&sheet=Hoja 1";
+        var bodyData = { "data": {} };
+        bodyData.data[columnaDestino] = horaActual;
+
+        try {
+            var response = await fetch(urlFinal, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bodyData)
+            });
+
+            if (response.ok) {
+                alert("✅ ¡Éxito! " + columnaDestino + " registrado correctamente.");
+                location.reload();
+            } else if (response.status === 429) {
+                alert("⚠️ Error: Límite de API de SheetDB alcanzado.");
+            }
+        } catch (err) {
+            alert("❌ Error de red o conexión.");
+        }
+
+        return;
+    }
+
     // COORDENADAS FIJAS (Planta)
     var latPlanta = -32.940227; 
     var lonPlanta = -68.761023; 
-    var radioMaximo = 200; 
+    var radioMaximo = 2000; 
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
         var latUser = pos.coords.latitude;
