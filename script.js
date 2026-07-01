@@ -145,7 +145,7 @@ async function gestionarEnvio(dniU, etapa, nombreU) {
     // COORDENADAS FIJAS (Planta)
     var latPlanta = -32.940227; 
     var lonPlanta = -68.761023; 
-    var radioMaximo = 20000; 
+    var radioMaximo = 200000; 
 
     navigator.geolocation.getCurrentPosition(async function(pos) {
         var latUser = pos.coords.latitude;
